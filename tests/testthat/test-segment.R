@@ -1,7 +1,8 @@
-# Segmentation: the engine registry, the built-in engine, and the tidy verb.
+# Segmentation: the engine registry, the built-in engines, and the tidy verb.
 #
-# No word segmenter is bundled -- jiebaR was archived from CRAN -- so the
-# registry is exercised with engines defined here.
+# Two engines ship: "icu", a dictionary-based word segmenter reached through
+# stringi, and "character", the dictionary-free baseline. The registry is
+# additionally exercised with engines defined here.
 
 test_that("the built-in engine is listed", {
   expect_true("character" %in% cjk_segmenters())
@@ -18,8 +19,8 @@ test_that("cjk_segmenters() orders by radix, not by the session's collation", {
              envir = .cjk_engine_registry), add = TRUE)
   for (nm in c("a", "B", "Z", "_x")) register_cjk_segmenter(nm, identity)
   got <- cjk_segmenters()
-  # radix is byte order: "B" < "Z" < "_x" < "a" < "character"
-  expect_equal(got, c("B", "Z", "_x", "a", "character"))
+  # radix is byte order: "B" < "Z" < "_x" < "a" < "character" < "icu"
+  expect_equal(got, c("B", "Z", "_x", "a", "character", "icu"))
   # The discriminating pair is B before a: byte order puts uppercase first and
   # every common collation does the opposite.
   expect_lt(which(got == "B"), which(got == "a"))
@@ -128,6 +129,28 @@ test_that("the character engine handles mixed scripts", {
     cjk_segment(EXT_B, engine = "character")[[1]],
     EXT_B
   )
+})
+
+test_that("an unknown engine is an error even for empty input", {
+  # Looked up after the zero-length exit, the engine was never checked for an
+  # empty vector, so a typo in a pipeline passed every empty batch.
+  expect_error(cjk_segment(character(0), engine = "nope"), "Unknown engine")
+  expect_error(cjk_segment(character(0), engine = 1),
+               "must be a single string or a function")
+  expect_error(cjk_tokens(data.frame(t = character(0)), t, engine = "nope"),
+               "Unknown engine")
+  # A caller's own engine is still not asked to handle an empty vector, as
+  # in 0.1.0: nothing in the engine contract warned that it might be.
+  called <- FALSE
+  spy <- function(x, ...) {
+    called <<- TRUE
+    lapply(x, identity)
+  }
+  expect_identical(cjk_segment(character(0), engine = spy), list())
+  expect_false(called)
+  # the built-in engines are, and answer an empty list
+  expect_identical(cjk_segment(character(0), engine = "icu"), list())
+  expect_identical(cjk_segment(character(0), engine = "character"), list())
 })
 
 test_that("cjk_segment() propagates NA and handles empty input", {
@@ -376,4 +399,284 @@ test_that("a registered word segmenter keeps a multi-character word whole", {
   expect_equal(cjk_segment(NA_character_, engine = "test_dict")[[1]],
                NA_character_)
   expect_equal(cjk_segment("", engine = "test_dict")[[1]], character(0))
+})
+
+
+# --- the ICU engine ---------------------------------------------------------
+# This is a real word segmenter, so the tests that matter are the ones showing
+# it does not merely split characters, plus the engine contract.
+
+test_that("the icu engine is a built-in", {
+  expect_true("icu" %in% cjk_segmenters())
+})
+
+test_that("icu segments Chinese into words, not characters", {
+  # The exact tokens are ICU's dictionary to choose, and a different ICU on a
+  # check farm may group them differently -- the same reasoning that keeps
+  # ambiguous widths out of test-width.R. What must hold on any build with a
+  # CJK dictionary is that this is word segmentation rather than character
+  # segmentation, and that it is lossless.
+  x <- "\u6211\u4eca\u5929\u5f88\u958b\u5fc3"          # six characters
+  tok <- cjk_segment(x, engine = "icu")[[1]]
+  expect_gt(length(tok), 1L)                    # not one blob
+  expect_lt(length(tok), 6L)                    # and not one token per character
+  expect_equal(paste(tok, collapse = ""), x)    # no character invented or lost
+  # at least one multi-character token, which is what a dictionary buys you
+  expect_true(any(nchar(tok) > 1L))
+  # the baseline, by contrast, is exactly one token per character
+  expect_length(cjk_segment(x, engine = "character")[[1]], 6L)
+})
+
+test_that("icu segments Japanese, and accepts a locale", {
+  tok <- cjk_segment("\u4eca\u65e5\u306f\u826f\u3044\u5929\u6c17\u3067\u3059\u306d", engine = "icu", locale = "ja")[[1]]
+  expect_true(length(tok) > 1L)
+  expect_true("\u4eca\u65e5" %in% tok)
+})
+
+test_that("icu drops whitespace and punctuation, unlike the character engine", {
+  expect_equal(cjk_segment("hello \u4e2d\u6587 world", engine = "icu")[[1]],
+               c("hello", "\u4e2d\u6587", "world"))
+  expect_false(any(grepl("^\\s+$", cjk_segment("\u4e2d\u6587 \u4f60\u597d", engine = "icu")[[1]])))
+})
+
+test_that("icu honours the engine contract for NA and empty", {
+  out <- cjk_segment(c("\u4e2d\u6587", NA, ""), engine = "icu")
+  expect_identical(out[[2]], NA_character_)
+  expect_identical(out[[3]], character(0))
+  expect_type(out, "list")
+  expect_length(out, 3L)
+})
+
+test_that("icu works through cjk_tokens", {
+  df <- data.frame(id = 1:2, text = c("\u6211\u4eca\u5929\u5f88\u958b\u5fc3", "hello \u4e2d\u6587"))
+  out <- cjk_tokens(df, text, engine = "icu")
+  expect_s3_class(out, "tbl_df")
+  expect_true(nrow(out) > 2L)
+})
+
+
+test_that("the two engines differ on punctuation, as documented", {
+  # ?cjk_segmenters says so explicitly, so it is pinned here: icu drops CJK
+  # punctuation and symbols, character keeps them.
+  expect_identical(cjk_segment("\u3002\u3002", engine = "icu")[[1]],
+                   character(0))
+  expect_equal(cjk_segment("\u3002\u3002", engine = "character")[[1]],
+               c("\u3002", "\u3002"))
+  # an emoji goes the same way
+  expect_identical(cjk_segment("\U0001F600", engine = "icu")[[1]],
+                   character(0))
+  expect_equal(cjk_segment("\U0001F600", engine = "character")[[1]],
+               "\U0001F600")
+})
+
+test_that("the icu engine rejects a locale ICU has no break data for", {
+  # Same guard as cjk_sentences() and cjk_sort(): a typo'd locale silently
+  # selects a different break iterator, which is a wrong answer that looks
+  # right.
+  expect_error(cjk_segment("\u4e2d\u6587", engine = "icu",
+                           locale = "not-a-locale"), "break data")
+  expect_silent(cjk_segment("\u4e2d\u6587", engine = "icu", locale = "zh"))
+})
+
+test_that("locale does not change CJK word segmentation", {
+  # Documented in ?cjk_segmenters and the segmentation vignette: ICU applies
+  # one combined Chinese-Japanese word list, chosen by the script of the
+  # text. If a future ICU makes this locale-sensitive, the docs are wrong and
+  # this should fail.
+  s <- "\u4eca\u65e5\u306f\u826f\u3044\u5929\u6c17\u3067\u3059\u306d"
+  base <- cjk_segment(s, engine = "icu")[[1]]
+  for (l in c("zh", "ja", "ko", "en")) {
+    expect_equal(cjk_segment(s, engine = "icu", locale = l)[[1]], base)
+  }
+})
+
+
+test_that("an engine returning non-atomic elements is an error, not a token", {
+  # as.character() deparses a list rather than coercing it, so before this
+  # check list(c(1, 2)) became the single token "c(1, 2)" -- R code spelled
+  # out as data. Same failure as the data frame case above, one level down.
+  register_cjk_segmenter("bad_list", function(x, ...) list(list(c(1, 2))))
+  expect_error(cjk_segment("ab", engine = "bad_list"),
+               "must return a character vector")
+  expect_error(cjk_segment("ab", engine = "bad_list"), "element 1")
+
+  register_cjk_segmenter("bad_fn", function(x, ...) list(mean))
+  expect_error(cjk_segment("ab", engine = "bad_fn"),
+               "must return a character vector")
+
+  # the element index names the offender
+  register_cjk_segmenter("bad_second",
+    function(x, ...) list(c("a", "b"), list("c")))
+  expect_error(cjk_segment(c("ab", "cd"), engine = "bad_second"), "element 2")
+
+  # and the coercions that were always fine stay fine
+  register_cjk_segmenter("ints", function(x, ...) list(1:2))
+  expect_equal(cjk_segment("ab", engine = "ints")[[1]], c("1", "2"))
+  register_cjk_segmenter("fct", function(x, ...) list(factor(c("a", "b"))))
+  expect_equal(cjk_segment("ab", engine = "fct")[[1]], c("a", "b"))
+  register_cjk_segmenter("nul", function(x, ...) list(NULL))
+  expect_equal(cjk_segment("ab", engine = "nul")[[1]], character(0))
+})
+
+
+test_that("neither engine deletes a byte-order mark", {
+  # stri_split_charclass() strips a leading U+FEFF from its input and
+  # omit_empty then discards the emptied piece, so a mark beginning a
+  # non-CJK run vanished from the character engine; stri_split_boundaries()
+  # drops a leading one, so the icu engine lost it at the start of a string
+  # while keeping one in the middle. Both are guarded now.
+  bom <- "\ufeff"
+  zh <- "\u4e2d\u6587"
+  keeps <- function(s, e) {
+    g <- cjk_segment(s, engine = e)[[1]]
+    grepl(bom, paste(g, collapse = ""), fixed = TRUE)
+  }
+  for (e in c("character", "icu")) {
+    expect_true(keeps(paste0("\u4e2d", bom, "\u6587"), e), info = e)
+    expect_true(keeps(paste0(bom, zh), e), info = e)
+    expect_true(keeps(paste0(zh, bom), e), info = e)
+    expect_true(keeps(bom, e), info = e)
+    expect_true(keeps(paste0(bom, bom), e), info = e)
+    expect_true(keeps(paste0("a", bom, "b"), e), info = e)
+  }
+  # The whole leading run, not just one mark -- asserted exactly, and for
+  # both engines. Checking only that "a mark survives" let a version that
+  # counted one and dropped the rest pass.
+  for (e in c("character", "icu")) {
+    expect_equal(cjk_segment(paste0(bom, bom), engine = e)[[1]],
+                 paste0(bom, bom), info = e)
+    expect_equal(cjk_segment(paste0(bom, bom, bom, "a"),
+                             engine = e)[[1]],
+                 paste0(bom, bom, bom, "a"), info = e)
+    # the count is preserved however many there are
+    for (k in 1:4) {
+      g <- cjk_segment(paste0(strrep(bom, k), "\u4e2d"), engine = e)[[1]]
+      expect_equal(
+        sum(vapply(strsplit(g, "", fixed = TRUE), function(z)
+                   sum(z == bom), integer(1))),
+        k, info = paste(e, k))
+    }
+  }
+  expect_equal(cjk_segment(paste0(bom, bom, "\u4e2d\u6587"),
+                           engine = "character")[[1]],
+               c(paste0(bom, bom), "\u4e2d", "\u6587"))
+})
+
+test_that("U+FEFF is tokenised like every other zero-width character", {
+  # The bug was not a policy about format characters: U+200B, U+200D,
+  # U+00AD and U+2060 are all zero-width and non-whitespace, and all four
+  # became tokens of their own. Only U+FEFF disappeared, which made the
+  # character engine inconsistent with its own documented rule.
+  peers <- c(0xFEFF, 0x200B, 0x200D, 0x00AD, 0x2060)
+  mid <- vapply(peers, function(cp)
+    length(cjk_segment(paste0("\u4e2d", intToUtf8(cp), "\u6587"),
+                       engine = "character")[[1]]), integer(1))
+  alone <- vapply(peers, function(cp)
+    length(cjk_segment(intToUtf8(cp), engine = "character")[[1]]),
+    integer(1))
+  expect_equal(mid, rep(3L, length(peers)))
+  expect_equal(alone, rep(1L, length(peers)))
+})
+
+test_that("the character engine is lossless apart from whitespace", {
+  # The property the BOM guard exists to keep. base gsub(), not stringi:
+  # a stringi pattern of U+FEFF alone arrives empty -- see R/ranges.R.
+  strip <- function(z) gsub("[ \t\r\n\u3000]", "", z)
+  set.seed(99)
+  pool <- c(intToUtf8(sample(0x4E00:0x9FA0, 40), multiple = TRUE),
+            letters[1:6], " ", "\t", "\u3000", "\ufeff", "\u200b",
+            "\u3002", ".", "-")
+  x <- vapply(seq_len(300), function(i)
+    paste(sample(pool, sample(0:12, 1), replace = TRUE), collapse = ""),
+    character(1))
+  # the corpus must actually contain marks, or this tests nothing
+  expect_gt(sum(grepl("\ufeff", x, fixed = TRUE)), 20L)
+  got <- cjk_segment(x, engine = "character")
+  rebuilt <- vapply(got, paste, character(1), collapse = "")
+  expect_equal(strip(rebuilt), strip(x))
+})
+
+
+test_that("the engines differ on zero-width characters, as documented", {
+  # ?cjk_segmenters says the character engine returns these as tokens and
+  # the icu engine drops a string-initial one -- and that U+FEFF is the
+  # exception, because stringi removes it before ICU is called rather than
+  # ICU classifying it away. Pinned so the guard is not "helpfully"
+  # generalised to the others, which would fight skip_word_none.
+  zh <- "\u4e2d\u6587"
+  keeps <- function(s, e, c0)
+    grepl(c0, paste(cjk_segment(s, engine = e)[[1]], collapse = ""),
+          fixed = TRUE)
+  # U+200B is "none" to ICU in every position; the other five only when
+  # they begin the string. The character engine keeps all of them.
+  only_leading <- c(0x200D, 0x00AD, 0x2060, 0x0301, 0xFE00)
+  for (cp in c(0x200B, only_leading)) {
+    c0 <- intToUtf8(cp)
+    lab <- sprintf("U+%04X", cp)
+    for (s in c(paste0(c0, zh), paste0("\u4e2d", c0, "\u6587"),
+                paste0(zh, c0))) {
+      expect_true(keeps(s, "character", c0), info = lab)
+    }
+    expect_false(keeps(paste0(c0, zh), "icu", c0), info = lab)
+  }
+  for (cp in only_leading) {
+    c0 <- intToUtf8(cp)
+    lab <- sprintf("U+%04X", cp)
+    expect_true(keeps(paste0("\u4e2d", c0, "\u6587"), "icu", c0), info = lab)
+    expect_true(keeps(paste0(zh, c0), "icu", c0), info = lab)
+  }
+  # the zero-width space is the one dropped in every position
+  zwsp <- intToUtf8(0x200B)
+  expect_false(keeps(paste0("\u4e2d", zwsp, "\u6587"), "icu", zwsp))
+  expect_false(keeps(paste0(zh, zwsp), "icu", zwsp))
+  # and U+FEFF is the exception in both engines
+  bom <- "\ufeff"
+  for (e in c("character", "icu")) {
+    expect_true(
+      grepl(bom, paste(cjk_segment(paste0(bom, zh), engine = e)[[1]],
+                       collapse = ""), fixed = TRUE), info = e)
+  }
+  # the reason it is an exception: stringi removes it before ICU is called,
+  # so it is absent even when nothing is asked to be skipped
+  keep_none <- function(s) stringi::stri_split_boundaries(
+    s, type = "word", skip_word_none = FALSE)[[1]]
+  expect_false(grepl(bom, paste(keep_none(paste0(bom, zh)), collapse = ""),
+                     fixed = TRUE))
+  for (cp in c(0x200B, only_leading)) {
+    c0 <- intToUtf8(cp)
+    expect_true(grepl(c0, paste(keep_none(paste0(c0, zh)), collapse = ""),
+                      fixed = TRUE), info = sprintf("U+%04X", cp))
+  }
+})
+
+
+test_that("cjk_tokens(output =) names the token column", {
+  d <- tibble::tibble(text = "\u6211\u4eca\u5929", token = "KEEP ME",
+                      other = 1L)
+  # the documented default still replaces an existing `token`
+  r <- cjk_tokens(d, text, engine = "character")
+  expect_equal(names(r), c("text", "token", "other"))
+  expect_equal(r$token, c("\u6211", "\u4eca", "\u5929"))
+
+  # and `output` is the way out of that
+  w <- cjk_tokens(d, text, engine = "character", output = "w")
+  expect_equal(names(w), c("text", "token", "other", "w"))
+  expect_equal(w$token, rep("KEEP ME", 3L))
+  expect_equal(w$w, c("\u6211", "\u4eca", "\u5929"))
+
+  # it must be named in full, because it follows `...`; an abbreviation is
+  # an engine argument, not this one, and the character engine ignores it
+  expect_silent(cjk_tokens(d, text, engine = "character", out = "w"))
+  expect_false("w" %in% names(cjk_tokens(d, text, engine = "character",
+                                         out = "w")))
+
+  # zero-row input keeps the named column and its type
+  z <- cjk_tokens(d[0, ], text, engine = "character", output = "w")
+  expect_equal(names(z), c("text", "token", "other", "w"))
+  expect_equal(z$w, character(0))
+
+  for (v in list(NA_character_, "", 1, c("a", "b"), NULL, list("a"))) {
+    expect_error(cjk_tokens(d, text, engine = "character", output = v),
+                 "`output` must be a single, non-empty string", fixed = TRUE)
+  }
 })

@@ -6,21 +6,51 @@
 \alias{tidycjk-package}
 \title{tidycjk: Tidy Tools for Chinese, Japanese and Korean Text}
 \description{
-A tidy toolkit for text that is written in Chinese, Japanese or Korean. Most text tooling in R assumes that words are separated by whitespace, which CJK writing does not use, so ordinary summaries of a text column either treat a sentence as one undifferentiated blob or split it into isolated characters. Word segmentation is therefore a pluggable engine that the caller names explicitly rather than a bundled dictionary, because where a word ends is a fact about a language and not about Unicode. 'tidycjk' classifies characters by Unicode block, reports which script and which language a text is written in, measures how much of a text is CJK, and turns those measurements into tibbles that slot straight into a 'tidyverse' workflow. It also measures display width in terminal columns, pads and truncates to a width rather than to a character count, and normalises fullwidth and halfwidth forms surgically -- including composing halfwidth katakana voiced marks into single code points -- without the collateral damage of a full 'NFKC' pass. Language detection deliberately returns NA rather than guessing when a text is written in Han characters only, because Japanese written without kana cannot be distinguished from Chinese by script alone. Everything is derived from the Unicode specification; the package makes no network requests and needs no compiled code of its own.
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
+A tidy toolkit for text that is written in Chinese, Japanese or Korean. Most text tooling in R assumes that words are separated by whitespace, which CJK writing does not use, so ordinary summaries of a text column either treat a sentence as one undifferentiated blob or split it into isolated characters. Word segmentation is a pluggable engine, with dictionary-based segmentation for Chinese and Japanese supplied through 'ICU' and further engines registrable by the caller, because where a word ends is a fact about a language and not about Unicode. 'tidycjk' classifies characters by Unicode block, reports which script and which language a text is written in, measures how much of a text is CJK, and turns those measurements into tibbles that slot straight into a 'tidyverse' workflow. It also measures display width in terminal columns, pads, truncates and wraps to a width rather than to a character count, and normalises fullwidth and halfwidth forms surgically -- including composing halfwidth katakana voiced marks into single code points -- while offering the Unicode normalisation forms separately for when a full 'NFKC' fold is what is wanted. Romanisation, conversion between simplified and traditional Han, conversion between the two kana syllabaries, and decomposition of Hangul syllables into jamo are provided on the same vectorised contract. Sentence segmentation, character n-grams, punctuation removal by Unicode category and locale-aware ordering cover the preprocessing that generic tooling gets wrong on CJK, where the sentence terminators are ideographic, a code point sort is not an alphabetical one, and the POSIX punctuation class is resolved by the C library rather than by Unicode. Language detection deliberately returns NA rather than guessing when a text is written in Han characters only, because Japanese written without kana cannot be distinguished from Chinese by script alone. Everything is derived from the Unicode specification; the package makes no network requests and needs no compiled code of its own.
 }
 \section{Output and naming contract}{
 
-The package has two layers. The \strong{vector layer} takes an atomic character
-vector and returns an atomic vector of the same length, in the manner of
-\pkg{stringr}: \code{\link[=has_cjk]{has_cjk()}}, \code{\link[=cjk_script]{cjk_script()}}, \code{\link[=cjk_detect_language]{cjk_detect_language()}},
-\code{\link[=cjk_width]{cjk_width()}}, \code{\link[=cjk_pad]{cjk_pad()}}, \code{\link[=cjk_truncate]{cjk_truncate()}}, \code{\link[=cjk_ratio]{cjk_ratio()}},
-\code{\link[=to_halfwidth]{to_halfwidth()}} and \code{\link[=to_fullwidth]{to_fullwidth()}}. \code{\link[=cjk_segment]{cjk_segment()}} belongs to the same
-layer but returns a list, because the number of tokens per string varies.
+The package has two layers. The \strong{vector layer} takes a character vector
+and returns a vector of the same length, in the manner of \pkg{stringr}:
+detection (\code{\link[=has_cjk]{has_cjk()}}, \code{\link[=cjk_script]{cjk_script()}}, \code{\link[=cjk_detect_language]{cjk_detect_language()}},
+\code{\link[=cjk_ratio]{cjk_ratio()}}), layout (\code{\link[=cjk_width]{cjk_width()}}, \code{\link[=cjk_pad]{cjk_pad()}}, \code{\link[=cjk_truncate]{cjk_truncate()}},
+\code{\link[=cjk_wrap]{cjk_wrap()}}), normalisation and cleaning (\code{\link[=to_halfwidth]{to_halfwidth()}},
+\code{\link[=to_fullwidth]{to_fullwidth()}}, \code{\link[=cjk_normalize]{cjk_normalize()}}, \code{\link[=cjk_strip_punct]{cjk_strip_punct()}}),
+transliteration (\code{\link[=cjk_romanize]{cjk_romanize()}}, \code{\link[=cjk_simplify]{cjk_simplify()}},
+\code{\link[=cjk_traditionalize]{cjk_traditionalize()}}, \code{\link[=to_hiragana]{to_hiragana()}}, \code{\link[=to_katakana]{to_katakana()}},
+\code{\link[=cjk_compose_jamo]{cjk_compose_jamo()}}) and ordering (\code{\link[=cjk_sort]{cjk_sort()}}, and \code{\link[=cjk_order]{cjk_order()}}, which
+returns the indices instead). \code{\link[=cjk_segment]{cjk_segment()}}, \code{\link[=cjk_sentences]{cjk_sentences()}},
+\code{\link[=cjk_ngrams]{cjk_ngrams()}} and \code{\link[=cjk_jamo]{cjk_jamo()}} belong to the same layer but return a
+list, because the number of pieces per string varies.
 The \strong{tidy layer} takes \code{verb(data, col, ...)} with the column unquoted and
 returns a tibble: \code{\link[=cjk_summary]{cjk_summary()}}, \code{\link[=cjk_char_counts]{cjk_char_counts()}} and \code{\link[=cjk_tokens]{cjk_tokens()}}.
 
-Every vector-layer function is vectorised, propagates \code{NA} element-wise,
-and returns a zero-length vector of the right type for zero-length input.
+Every vector-layer function is vectorised, propagates \code{NA} element-wise
+(the ordering verbs keep it and sort it last), and returns a zero-length
+result of the right type for zero-length input. Arguments are checked
+before that exit, so a bad argument is an error whatever the length of the
+input.
+}
+
+\section{Input encoding}{
+
+Text has to reach R either as UTF-8 or with its encoding declared, which
+means naming the encoding when the file is read: \code{read.csv(f, fileEncoding = "GBK")}, \code{readLines(file(f, encoding = "Shift_JIS"))}, \code{readr}'s
+\code{locale(encoding = "EUC-KR")}, or \code{\link[stringi:stri_encode]{stringi::stri_encode()}} afterwards.
+(The \code{encoding} argument of \code{read.csv()} and \code{readLines()} is not the one
+to use: it only labels the strings, so GBK bytes stay GBK and
+\code{read.csv()} fails on them outright in a UTF-8 session.)
+
+Whether a string of bytes can be read at all depends on the session's
+native encoding: GBK bytes with no declaration are invalid in a UTF-8
+locale and ordinary text in a GB18030 one, and both answers are right.
+When the bytes cannot be read, every verb stops with "\code{x} must be valid
+UTF-8", naming the argument and the legacy encodings, before doing any
+work; none of them hands back replacement characters or quietly drops the
+bytes it could not read. A string marked \code{"bytes"} is refused the same
+way, because its characters cannot be read either.
 }
 
 \section{What counts as CJK}{
@@ -35,23 +65,26 @@ you actually have, so the wide definition never hides the detail.
 
 \section{Related packages}{
 
-\pkg{tidycjk} deliberately stops where another package already does the job:
+\pkg{tidycjk} bundles one word segmenter, one romaniser and one script
+converter, all of them ICU's. These go further, each in its own direction:
 \itemize{
-\item Chinese word segmentation --
-\href{https://CRAN.R-project.org/package=jiebaR}{jiebaR}, which
-\code{\link[=cjk_segmenters]{cjk_segmenters()}} shows how to register as an engine. It was archived
-from CRAN on 2025-05-01, which is why it is not a dependency.
-\item Romanisation -- \href{https://CRAN.R-project.org/package=pinyin}{pinyin} and
-\href{https://CRAN.R-project.org/package=hanyupinyin}{hanyupinyin}.
-\item Traditional/simplified conversion --
-\href{https://CRAN.R-project.org/package=tmcn}{tmcn} at the character level.
-Character-level conversion is context-blind and often wrong, so this
-package ships none; \href{https://github.com/BYVoid/OpenCC}{OpenCC} is the
-phrase-level answer outside R.
-\item Japanese-specific utilities --
-\href{https://CRAN.R-project.org/package=zipangu}{zipangu} and
-\href{https://CRAN.R-project.org/package=Nippon}{Nippon}.
-\item Tokenising whitespace-delimited text --
+\item Japanese morphological analysis:
+\href{https://CRAN.R-project.org/package=gibasa}{gibasa}, a MeCab binding that
+gives part of speech, lemma and reading, which the \code{"icu"} engine does
+not. \href{https://CRAN.R-project.org/package=audubon}{audubon} collects
+Japanese text utilities.
+\item Segmentation with a model rather than a word list:
+\href{https://CRAN.R-project.org/package=udpipe}{udpipe}, whose Universal
+Dependencies models cover Chinese, Japanese and Korean and are
+downloaded separately.
+\item Chinese segmentation with jieba's tuned dictionaries:
+\href{https://CRAN.R-project.org/package=jiebaR}{jiebaR}, archived from CRAN
+on 2025-05-01 and installable from GitHub; \code{\link[=cjk_segmenters]{cjk_segmenters()}} shows how
+to register it as an engine.
+\item Pinyin: \href{https://CRAN.R-project.org/package=hanyupinyin}{hanyupinyin}.
+\item Regional vocabulary in simplified/traditional conversion, which ICU does
+not attempt: \href{https://github.com/BYVoid/OpenCC}{OpenCC}, outside R.
+\item Tokenising whitespace-delimited text:
 \href{https://CRAN.R-project.org/package=tidytext}{tidytext}, whose
 \code{unnest_tokens()} \code{\link[=cjk_tokens]{cjk_tokens()}} mirrors for text that has no spaces
 between words.
@@ -60,31 +93,29 @@ between words.
 
 \section{Relationship to stringi}{
 
-\pkg{tidycjk} does not re-implement Unicode. Display width comes from
-\code{\link[stringi:stri_width]{stringi::stri_width()}} and padding from \code{\link[stringi:stri_pad]{stringi::stri_pad()}} --
-\href{https://CRAN.R-project.org/package=stringi}{stringi} -- both of which
-read the live Unicode tables in \href{https://icu.unicode.org}{ICU}, the
-Unicode Consortium's C library. \pkg{tidycjk} adds the CJK-specific
-layer on top and keeps the naming consistent with the rest of the package.
-If all you need is the width of a string, call \pkg{stringi} directly.
+\pkg{tidycjk} does not re-implement Unicode. Width, padding and wrapping
+come from \code{\link[stringi:stri_width]{stringi::stri_width()}}, \code{\link[stringi:stri_pad]{stringi::stri_pad()}} and
+\code{\link[stringi:stri_wrap]{stringi::stri_wrap()}}; words, sentences and ordering from ICU's break
+iterators and collators; romanisation and script and kana conversion from
+ICU transforms. All of it is reached through
+\href{https://CRAN.R-project.org/package=stringi}{stringi}, which carries
+\href{https://icu.unicode.org}{ICU}, the Unicode Consortium's C library.
+\pkg{tidycjk} adds the CJK layer on top: one contract across the verbs,
+and guards where ICU's own behaviour is quietly wrong for this use. If
+all you need is the width of a string, call \pkg{stringi} directly.
 }
 
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://pursuitofdatascience.github.io/tidyckj/}
-  \item \url{https://github.com/PursuitOfDataScience/tidyckj}
-  \item Report bugs at \url{https://github.com/PursuitOfDataScience/tidyckj/issues}
+  \item \url{https://pursuitofdatascience.github.io/tidycjk/}
+  \item \url{https://github.com/PursuitOfDataScience/tidycjk}
+  \item Report bugs at \url{https://github.com/PursuitOfDataScience/tidycjk/issues}
 }
 
 }
 \author{
 \strong{Maintainer}: Youzhi Yu \email{yuyouzhi666@icloud.com}
-
-Authors:
-\itemize{
-  \item Youzhi Yu \email{yuyouzhi666@icloud.com}
-}
 
 }
 \keyword{internal}

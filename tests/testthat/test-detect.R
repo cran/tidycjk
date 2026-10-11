@@ -120,6 +120,50 @@ test_that("the Han-only guess is available but has to be asked for", {
   expect_error(cjk_detect_language(ZH, han_only = c("a", "b")), "single string")
 })
 
+test_that("the katakana middle dot is not evidence of Japanese", {
+  # U+30FB separates the parts of a transliterated name in Chinese and Korean
+  # text as well as in Japanese, which is what its Script_Extensions say.
+  # Counted as kana it fired the first rule, so a Korean string came back
+  # "japanese". U+FF65 is its halfwidth form.
+  ko <- "\uc11c\uc6b8\u30fb\ubd80\uc0b0"            # "Seoul / Busan"
+  expect_equal(cjk_detect_language(ko), "korean")
+  expect_equal(cjk_detect_language(sub("\u30fb", "\uff65", ko)), "korean")
+  zh <- "\u7d04\u7ff0\u30fb\u53f2\u5bc6\u65af"      # "John Smith"
+  expect_true(is.na(cjk_detect_language(zh)))
+  expect_equal(cjk_detect_language(zh, han_only = "chinese"), "chinese")
+  expect_true(is.na(cjk_detect_language("\u30fb")))
+  # real kana still settles it, and so does the prolonged sound mark, which
+  # only Japanese uses
+  expect_equal(
+    cjk_detect_language("\u30b8\u30e7\u30f3\u30fb\u30b9\u30df\u30b9"),
+    "japanese"
+  )
+  expect_equal(cjk_detect_language("\u30fc"), "japanese")
+  # cjk_script() reports the block, as documented, so there the dot is still
+  # katakana
+  expect_equal(cjk_script("\u30fb"), "katakana")
+})
+
+test_that("CJK punctuation does not stop Han text being recognised", {
+  # Every Han fixture above is punctuation-free, which left the commonest
+  # real input untested: a Chinese sentence ends in U+3002, and U+3002 is a
+  # CJK block with a script of its own ("punctuation"). The Han rule asks
+  # whether ANY character is Han, so the full stop is beside the point --
+  # but nothing pinned that, and asking whether ALL of them are Han would
+  # turn every punctuated sentence into NA.
+  punct <- c("\u4e2d\u3002", "\u4e2d\u6587\uff0c\u5f88\u597d\u3002",
+             "\u4e2d\uff08\u6587\uff09", "\u3002\u4e2d")
+  expect_equal(cjk_detect_language(punct, han_only = "chinese"),
+               rep("chinese", length(punct)))
+  # The same for the scripts of a punctuated Japanese sentence.
+  expect_equal(cjk_detect_language(paste0(JA_KANA, "\u3002")), "japanese")
+  expect_equal(cjk_detect_language(paste0(KO, "\u3002")), "korean")
+  # cjk_script() counts rather than prioritises, so there the punctuation
+  # does carry weight -- and wins outright once it outnumbers the Han.
+  expect_equal(cjk_script("\u4e2d\u6587\u3002"), "han")
+  expect_equal(cjk_script("\u4e2d\u3002\u3002"), "punctuation")
+})
+
 test_that("han_only is not silently coerced from another type", {
   # as.character() on its own answered "1" for han_only = 1 and "TRUE" for
   # han_only = TRUE, returning a typo as a language rather than reporting it
@@ -203,4 +247,24 @@ test_that("every ratio is a proportion", {
   x <- c(ZH, ZH_SENTENCE, JA_MIXED, KO, "ascii", paste0("mix ", ZH))
   r <- cjk_ratio(x)
   expect_true(all(r >= 0 & r <= 1))
+})
+
+test_that("han_only rejects the values that used to become languages", {
+  han <- "\u6771\u4eac\u90fd"
+  # is.na(NaN) is TRUE, so this used to return the language "NaN"
+  expect_error(cjk_detect_language(han, han_only = NaN), "`han_only`")
+  # is.na(list(NA)) is TRUE and as.character(list(NA)) is the string "NA",
+  # which is not a missing value -- worse than an error, because downstream
+  # is.na() would call it an answer
+  expect_error(cjk_detect_language(han, han_only = list(NA)), "`han_only`")
+  expect_error(cjk_detect_language(han, han_only = list("chinese")),
+               "`han_only`")
+})
+
+test_that("han_only still accepts a string and every flavour of NA", {
+  han <- "\u6771\u4eac\u90fd"
+  expect_equal(cjk_detect_language(han, han_only = "chinese"), "chinese")
+  for (na in list(NA, NA_character_, NA_integer_, NA_real_)) {
+    expect_identical(cjk_detect_language(han, han_only = na), NA_character_)
+  }
 })

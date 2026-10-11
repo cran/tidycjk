@@ -12,7 +12,10 @@ cjk_segment(x, engine, ...)
 numeric vector is measured as R chooses to write it -- which moves
 with \code{options(scipen)} and \code{options(OutDec)}, and can therefore
 differ between sessions. Convert deliberately if you mean to
-measure numbers; these verbs are for text.}
+measure numbers; these verbs are for text. A list is \emph{not} coerced --
+\code{\link[=as.character]{as.character()}} deparses one rather than coercing it, so the text
+measured would be the R code that builds the list -- so a list, a data
+frame or a function is an error naming what to do instead.}
 
 \item{engine}{Name of a segmentation engine, or a function implementing
 one. Required; see \code{\link[=cjk_segmenters]{cjk_segmenters()}}.}
@@ -32,14 +35,22 @@ put spaces between words, so splitting on whitespace returns the whole
 sentence as one token; this dispatches to a segmentation engine instead.
 }
 \details{
-\code{engine} is required and has no default. The only engine \pkg{tidycjk} can
-ship without a dictionary is \code{"character"}, which tokenises by character
-rather than by word -- a different answer from the one you are asking for,
-and quietly returning it would be the mistake this package exists to avoid.
-\code{\link[=cjk_segmenters]{cjk_segmenters()}} lists what is available and shows how to register a real
-word segmenter.
+Two engines ship with the package. \code{"icu"} is a real word segmenter, using
+the dictionary ICU carries inside \pkg{stringi}, so it costs no dependency
+you have not already installed. \code{"character"} tokenises by character rather
+than by word.
+
+\code{engine} is required and has no default, because \code{"character"} answers a
+different question from the one a caller asking for words is asking, and
+quietly returning it would be the mistake this package exists to avoid.
+The two also differ on punctuation: \code{"icu"} drops it, \code{"character"} keeps
+CJK punctuation as tokens. \code{\link[=cjk_segmenters]{cjk_segmenters()}} lists what is available and
+shows how to register another.
 }
 \examples{
+# a real word segmenter: four words, not six characters
+cjk_segment("\u6211\u4eca\u5929\u5f88\u958b\u5fc3", engine = "icu")
+
 # the dictionary-free baseline, one token per CJK character
 cjk_segment("\u6211\u4eca\u5929\u5f88\u958b\u5fc3", engine = "character")
 

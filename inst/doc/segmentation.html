@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Youzhi Yu University of Chicago" />
+
+
+<title>Segmenting CJK text</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+<style type="text/css">
+
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+margin-bottom: 0em;
+}
+.hanging div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
+}
+div.csl-left-margin {
+min-width:2em;
+float:left;
+}
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
+}
+div.csl-indent {
+margin-left: 2em;
+}
+</style>
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Segmenting CJK text</h1>
+<h4 class="author">Youzhi Yu<br><span style="font-weight: 400; font-size: 0.85em;">University of
+Chicago</span></h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#the-problem" id="toc-the-problem">The problem</a></li>
+<li><a href="#choosing-an-engine" id="toc-choosing-an-engine">Choosing
+an engine</a>
+<ul>
+<li><a href="#icu-dictionary-based-and-already-installed" id="toc-icu-dictionary-based-and-already-installed"><code>&quot;icu&quot;</code>:
+dictionary-based, and already installed</a></li>
+<li><a href="#character-the-honest-baseline" id="toc-character-the-honest-baseline"><code>&quot;character&quot;</code>: the
+honest baseline</a></li>
+<li><a href="#why-there-is-no-default" id="toc-why-there-is-no-default">Why there is no default</a></li>
+<li><a href="#locale-does-not-pick-the-dictionary" id="toc-locale-does-not-pick-the-dictionary"><code>locale</code> does
+not pick the dictionary</a></li>
+</ul></li>
+<li><a href="#in-a-pipeline" id="toc-in-a-pipeline">In a
+pipeline</a></li>
+<li><a href="#registering-another-engine" id="toc-registering-another-engine">Registering another engine</a>
+<ul>
+<li><a href="#gibasa-for-japanese" id="toc-gibasa-for-japanese">gibasa,
+for Japanese</a></li>
+<li><a href="#jiebar-for-chinese" id="toc-jiebar-for-chinese">jiebaR,
+for Chinese</a></li>
+<li><a href="#a-caution-about-argument-matching" id="toc-a-caution-about-argument-matching">A caution about argument
+matching</a></li>
+</ul></li>
+<li><a href="#comparing-engines" id="toc-comparing-engines">Comparing
+engines</a></li>
+<li><a href="#references" id="toc-references">References</a></li>
+</ul>
+</div>
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(tidycjk)</span></code></pre></div>
+<div id="the-problem" class="section level2">
+<h2>The problem</h2>
+<p>English tokenisation is mostly a solved problem because English
+writes its word boundaries down. You split on whitespace and you are
+close enough. In Chinese and Japanese there is no such signal:</p>
+<blockquote>
+<p>我今天很開心</p>
+</blockquote>
+<p>Six characters, no spaces, four words: <code>我</code> (I),
+<code>今天</code> (today), <code>很</code> (very), <code>開心</code>
+(happy). Nothing in the <em>encoding</em> tells you that <code>今</code>
+and <code>天</code> belong together while <code>很</code> stands alone.
+That is a fact about Chinese, learned from a corpus, and Unicode makes
+no claim about it. Unicode Annex #29 defines word boundaries for scripts
+that mark them and explicitly defers to dictionaries for those that do
+not <span class="citation">(Unicode Consortium 2026)</span>.</p>
+<p>This is why <code>tidycjk</code> does not have a single
+<code>tokenize()</code>. It has an engine slot.</p>
+</div>
+<div id="choosing-an-engine" class="section level2">
+<h2>Choosing an engine</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">cjk_segmenters</span>()</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;character&quot; &quot;icu&quot;</span></span></code></pre></div>
+<div id="icu-dictionary-based-and-already-installed" class="section level3">
+<h3><code>&quot;icu&quot;</code>: dictionary-based, and already installed</h3>
+<p>ICU ships dictionary-based break iterators for Chinese and Japanese,
+and <strong>stringi</strong> ships ICU <span class="citation">(Unicode
+Consortium 2024; Gagolewski 2022)</span>. Since <strong>stringi</strong>
+is already a hard dependency of this package, real word segmentation
+costs nothing extra:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">cjk_segment</span>(<span class="st">&quot;我今天很開心&quot;</span>, <span class="at">engine =</span> <span class="st">&quot;icu&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;我&quot;   &quot;今天&quot; &quot;很&quot;   &quot;開心&quot;</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">cjk_segment</span>(<span class="st">&quot;今天天氣很好我們去公園散步&quot;</span>, <span class="at">engine =</span> <span class="st">&quot;icu&quot;</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;今天&quot; &quot;天氣&quot; &quot;很好&quot; &quot;我們&quot; &quot;去&quot;   &quot;公園&quot; &quot;散步&quot;</span></span></code></pre></div>
+<p>Japanese works out of the box. <code>locale</code> is accepted but
+does not change the result; “<code>locale</code> does not pick the
+dictionary” below says why:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">cjk_segment</span>(<span class="st">&quot;今日は良い天気ですね&quot;</span>, <span class="at">engine =</span> <span class="st">&quot;icu&quot;</span>, <span class="at">locale =</span> <span class="st">&quot;ja&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;今日&quot; &quot;は&quot;   &quot;良い&quot; &quot;天気&quot; &quot;です&quot; &quot;ね&quot;</span></span></code></pre></div>
+<p>Anything in <code>...</code> reaches the engine, which is how
+<code>locale</code> gets there.</p>
+<p>What <code>&quot;icu&quot;</code> gives you is surface forms and nothing else:
+no part of speech, no lemma, no user dictionary, and models lighter than
+the ones a dedicated analyser carries. It is the right first choice and
+not the last word.</p>
+</div>
+<div id="character-the-honest-baseline" class="section level3">
+<h3><code>&quot;character&quot;</code>: the honest baseline</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">cjk_segment</span>(<span class="st">&quot;我今天很開心&quot;</span>, <span class="at">engine =</span> <span class="st">&quot;character&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;我&quot; &quot;今&quot; &quot;天&quot; &quot;很&quot; &quot;開&quot; &quot;心&quot;</span></span></code></pre></div>
+<p>One token per CJK character; runs of non-CJK text split on
+whitespace. Whitespace is never a token, the ideographic space U+3000
+included, even though <code>has_cjk()</code> counts it as CJK, because
+it is a space and treating it as a word would inflate every count.</p>
+<p>This is <em>character</em> tokenisation, not word segmentation. For
+Chinese it cuts two-character words in half. It is genuinely useful when
+a per-character unit is what you want (character frequency, or a
+character-level model) and misleading if you call its output
+“words”.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">cjk_segment</span>(<span class="st">&quot;hello 中文 world&quot;</span>, <span class="at">engine =</span> <span class="st">&quot;character&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;hello&quot; &quot;中&quot;    &quot;文&quot;    &quot;world&quot;</span></span></code></pre></div>
+</div>
+<div id="why-there-is-no-default" class="section level3">
+<h3>Why there is no default</h3>
+<p><code>engine</code> is required. There is a real temptation to
+default it to <code>&quot;character&quot;</code>, and the reason not to is that it
+answers a <em>different question</em> from the one a caller asking for
+words is asking, while looking like an answer to theirs. Silence there
+is the failure mode this package exists to prevent.</p>
+<p><code>&quot;icu&quot;</code> arriving does not change that. It would be a
+defensible default in a way <code>&quot;character&quot;</code> never was, but a
+default is a decision made on the caller’s behalf about what a word is,
+and this package would rather that decision were visible in the calling
+code.</p>
+</div>
+<div id="locale-does-not-pick-the-dictionary" class="section level3">
+<h3><code>locale</code> does not pick the dictionary</h3>
+<p>It is natural to assume it does, and it does not. ICU applies one
+combined Chinese–Japanese word list to Han and kana runs, selected by
+the <em>script of the text</em> rather than by the locale <span class="citation">(Unicode Consortium 2024)</span>. Segmenting seven CJK
+strings under <code>&quot;zh&quot;</code>, <code>&quot;ja&quot;</code>, <code>&quot;ko&quot;</code>,
+<code>&quot;en&quot;</code> and the session default gives identical output in
+every case.</p>
+<p><code>locale</code> is still accepted and forwarded, because ICU may
+use it elsewhere and a locale ICU has no break data for is an error
+rather than a silent fallback, but do not expect
+<code>locale = &quot;ja&quot;</code> to change how Japanese segments.</p>
+</div>
+</div>
+<div id="in-a-pipeline" class="section level2">
+<h2>In a pipeline</h2>
+<p><code>cjk_tokens()</code> takes <code>(data, column)</code> and
+returns one row per token, in the manner of <strong>tidytext</strong>’s
+<code>unnest_tokens()</code> <span class="citation">(Silge and Robinson
+2016)</span>:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>posts <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">id =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">text =</span> <span class="fu">c</span>(<span class="st">&quot;我今天很開心&quot;</span>, <span class="st">&quot;今天天氣很好&quot;</span>, <span class="st">&quot;hello 中文 world&quot;</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">cjk_tokens</span>(posts, text, <span class="at">engine =</span> <span class="st">&quot;icu&quot;</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt; # A tibble: 10 × 3</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt;       id text             token</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt;    &lt;int&gt; &lt;chr&gt;            &lt;chr&gt;</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt;  1     1 我今天很開心     我   </span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt;  2     1 我今天很開心     今天 </span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt;  3     1 我今天很開心     很   </span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt;  4     1 我今天很開心     開心 </span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="co">#&gt;  5     2 今天天氣很好     今天 </span></span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co">#&gt;  6     2 今天天氣很好     天氣 </span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="co">#&gt;  7     2 今天天氣很好     很好 </span></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a><span class="co">#&gt;  8     3 hello 中文 world hello</span></span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="co">#&gt;  9     3 hello 中文 world 中文 </span></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a><span class="co">#&gt; 10     3 hello 中文 world world</span></span></code></pre></div>
+<p>Grouping is dropped, and other columns are carried along, so the
+usual counting follows directly:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>tok <span class="ot">&lt;-</span> <span class="fu">cjk_tokens</span>(posts, text, <span class="at">engine =</span> <span class="st">&quot;icu&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">table</span>(tok<span class="sc">$</span>token), <span class="at">decreasing =</span> <span class="cn">TRUE</span>)[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt;  今天 hello world  中文  天氣 </span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt;     2     1     1     1     1</span></span></code></pre></div>
+</div>
+<div id="registering-another-engine" class="section level2">
+<h2>Registering another engine</h2>
+<p>An engine is any function of <code>(x, ...)</code> returning a list
+the same length as <code>x</code>, each element a character vector of
+tokens. <code>NA</code> in gives <code>NA_character_</code>; the empty
+string gives <code>character(0)</code>. <code>cjk_segment()</code>
+checks the shape and complains if an engine breaks the contract, rather
+than passing a malformed result downstream: it checks the list itself,
+its length, and the type of each element. An atomic element is coerced,
+so integers or a factor are fine; a list element is refused, because
+<code>as.character()</code> deparses a list rather than coercing it and
+<code>list(c(1, 2))</code> would otherwise arrive as the single token
+<code>&quot;c(1, 2)&quot;</code>.</p>
+<p>A leading byte-order mark survives both built-in engines, which takes
+work: the stringi calls underneath them each read a leading U+FEFF as a
+byte-order mark and drop it. An engine you register yourself gets no
+such help: if it calls stringi, it needs the same guard.</p>
+<div id="gibasa-for-japanese" class="section level3">
+<h3>gibasa, for Japanese</h3>
+<p><a href="https://CRAN.R-project.org/package=gibasa">gibasa</a> binds
+MeCab <span class="citation">(Kudo, Yamamoto, and Matsumoto 2004; Kato
+2025)</span> and is on CRAN, though it needs MeCab itself and a
+dictionary installed on the system. It gives part of speech and lemma,
+which ICU does not:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">register_cjk_segmenter</span>(<span class="st">&quot;mecab&quot;</span>, <span class="cf">function</span>(x, ...) {</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="fu">lapply</span>(x, <span class="cf">function</span>(s) {</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.na</span>(s)) <span class="fu">return</span>(<span class="cn">NA_character_</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    <span class="cf">if</span> (<span class="sc">!</span><span class="fu">nzchar</span>(s)) <span class="fu">return</span>(<span class="fu">character</span>(<span class="dv">0</span>))</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    gibasa<span class="sc">::</span><span class="fu">tokenize</span>(<span class="fu">data.frame</span>(<span class="at">doc_id =</span> <span class="dv">1</span>, <span class="at">text =</span> s))<span class="sc">$</span>token</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  })</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>})</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="fu">cjk_segment</span>(<span class="st">&quot;今日は良い天気ですね&quot;</span>, <span class="at">engine =</span> <span class="st">&quot;mecab&quot;</span>)</span></code></pre></div>
+</div>
+<div id="jiebar-for-chinese" class="section level3">
+<h3>jiebaR, for Chinese</h3>
+<p>jiebaR was archived from CRAN on 2025-05-01, so it cannot be a
+dependency of a CRAN package; install it from source with
+<code>remotes::install_github(&quot;qinwf/jiebaR&quot;)</code>. Then:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">register_cjk_segmenter</span>(<span class="st">&quot;jiebar&quot;</span>, <span class="cf">function</span>(x, ...) {</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  worker <span class="ot">&lt;-</span> jiebaR<span class="sc">::</span><span class="fu">worker</span>(...)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">lapply</span>(x, <span class="cf">function</span>(s) {</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.na</span>(s)) <span class="fu">return</span>(<span class="cn">NA_character_</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="cf">if</span> (<span class="sc">!</span><span class="fu">nzchar</span>(s)) <span class="fu">return</span>(<span class="fu">character</span>(<span class="dv">0</span>))</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    <span class="fu">as.character</span>(jiebaR<span class="sc">::</span><span class="fu">segment</span>(s, worker))</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  })</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>})</span></code></pre></div>
+</div>
+<div id="a-caution-about-argument-matching" class="section level3">
+<h3>A caution about argument matching</h3>
+<p><code>...</code> sits after <code>engine</code> in
+<code>cjk_segment()</code>, and after <code>data</code> and
+<code>col</code> in <code>cjk_tokens()</code>, so R’s partial matching
+claims a prefix of one of those before the dots see it.
+<code>cjk_tokens(df, text, &quot;mine&quot;, c = 1)</code> matches <code>c</code>
+to <code>col</code>, pushes bare <code>text</code> into
+<code>engine</code>, resolves it to <code>graphics::text()</code>, which
+is a function and so is accepted, and the error you get is about
+plotting. Name engine arguments so they are not a prefix of
+<code>col</code>, <code>data</code> or <code>engine</code>, or capture
+the setting in a closure:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">register_cjk_segmenter</span>(<span class="st">&quot;mine&quot;</span>, <span class="cf">function</span>(x, ...) <span class="fu">my_segmenter</span>(x, <span class="at">cutoff =</span> <span class="dv">1</span>))</span></code></pre></div>
+</div>
+</div>
+<div id="comparing-engines" class="section level2">
+<h2>Comparing engines</h2>
+<p>Because engines share a contract, comparing them is a
+<code>lapply()</code>:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="st">&quot;今天天氣很好&quot;</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">vapply</span>(<span class="fu">c</span>(<span class="st">&quot;icu&quot;</span>, <span class="st">&quot;character&quot;</span>),</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>       <span class="cf">function</span>(e) <span class="fu">paste</span>(<span class="fu">cjk_segment</span>(x, <span class="at">engine =</span> e)[[<span class="dv">1</span>]], <span class="at">collapse =</span> <span class="st">&quot; | &quot;</span>),</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>       <span class="fu">character</span>(<span class="dv">1</span>))</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt;                           icu                     character </span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt;          &quot;今天 | 天氣 | 很好&quot; &quot;今 | 天 | 天 | 氣 | 很 | 好&quot;</span></span></code></pre></div>
+<p>That is the intended way to decide: run the candidates over a sample
+of <em>your</em> corpus and read the disagreements, rather than trusting
+a benchmark computed on someone else’s text.</p>
+</div>
+<div id="references" class="section level2 unnumbered">
+<h2 class="unnumbered">References</h2>
+<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="ref-gagolewski2022stringi" class="csl-entry">
+Gagolewski, Marek. 2022. <span>“<span class="nocase">stringi</span>:
+Fast and Portable Character String Processing in <span>R</span>.”</span>
+<em>Journal of Statistical Software</em> 103 (2): 1–59. <a href="https://doi.org/10.18637/jss.v103.i02">https://doi.org/10.18637/jss.v103.i02</a>.
+</div>
+<div id="ref-gibasa" class="csl-entry">
+Kato, Akiru. 2025. <em><span class="nocase">gibasa</span>: An
+Alternative ’Rcpp’ Wrapper of ’MeCab’</em>. <a href="https://CRAN.R-project.org/package=gibasa">https://CRAN.R-project.org/package=gibasa</a>.
+</div>
+<div id="ref-kudo2004mecab" class="csl-entry">
+Kudo, Taku, Kaoru Yamamoto, and Yuji Matsumoto. 2004. <span>“Applying
+Conditional Random Fields to <span>J</span>apanese Morphological
+Analysis.”</span> In <em>Proceedings of the 2004 Conference on Empirical
+Methods in Natural Language Processing (EMNLP)</em>, 230–37.
+</div>
+<div id="ref-silge2016tidytext" class="csl-entry">
+Silge, Julia, and David Robinson. 2016. <span>“Tidytext: Text Mining and
+Analysis Using Tidy Data Principles in <span>R</span>.”</span>
+<em>Journal of Open Source Software</em> 1 (3): 37. <a href="https://doi.org/10.21105/joss.00037">https://doi.org/10.21105/joss.00037</a>.
+</div>
+<div id="ref-icu" class="csl-entry">
+Unicode Consortium. 2024. <em><span class="nocase">International
+Components for Unicode</span></em>. <a href="https://icu.unicode.org/">https://icu.unicode.org/</a>.
+</div>
+<div id="ref-uax29" class="csl-entry">
+———. 2026. <span>“<span>Unicode Standard Annex #29: Unicode Text
+Segmentation</span>.”</span> Unicode Consortium. <a href="https://www.unicode.org/reports/tr29/">https://www.unicode.org/reports/tr29/</a>.
+</div>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

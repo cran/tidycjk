@@ -12,7 +12,10 @@ cjk_truncate(x, width, ellipsis = "...")
 numeric vector is measured as R chooses to write it -- which moves
 with \code{options(scipen)} and \code{options(OutDec)}, and can therefore
 differ between sessions. Convert deliberately if you mean to
-measure numbers; these verbs are for text.}
+measure numbers; these verbs are for text. A list is \emph{not} coerced --
+\code{\link[=as.character]{as.character()}} deparses one rather than coercing it, so the text
+measured would be the R code that builds the list -- so a list, a data
+frame or a function is an error naming what to do instead.}
 
 \item{width}{Maximum display width in columns. Recycled against \code{x}; a pair
 of lengths that does not recycle cleanly is an error.}
@@ -43,11 +46,15 @@ zero-width character immediately after the cut point is carried along with
 it.
 }
 \examples{
-# six columns is three ideographs
+# six columns would be three ideographs, but "..." is counted against
+# the budget and costs three of them, so one ideograph is what fits
 cjk_truncate("\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587", 6)
 
-# ASCII, same budget
+# the same six columns hold three ASCII characters plus the ellipsis
 cjk_truncate("abcdefghij", 6)
+
+# drop the ellipsis and all six columns are available again
+cjk_truncate("\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587", 6, ellipsis = "")
 
 # already fits, so nothing happens
 cjk_truncate("\u4e2d\u6587", 10)

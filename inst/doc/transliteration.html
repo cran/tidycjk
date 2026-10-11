@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Youzhi Yu University of Chicago" />
+
+
+<title>Romanisation, script conversion and kana</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+<style type="text/css">
+
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+margin-bottom: 0em;
+}
+.hanging div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
+}
+div.csl-left-margin {
+min-width:2em;
+float:left;
+}
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
+}
+div.csl-indent {
+margin-left: 2em;
+}
+</style>
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Romanisation, script conversion and
+kana</h1>
+<h4 class="author">Youzhi Yu<br><span style="font-weight: 400; font-size: 0.85em;">University of
+Chicago</span></h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#four-conversions-four-different-levels-of-trust" id="toc-four-conversions-four-different-levels-of-trust">Four
+conversions, four different levels of trust</a></li>
+<li><a href="#hangul-jamo-exact" id="toc-hangul-jamo-exact">Hangul jamo:
+exact</a></li>
+<li><a href="#kana-safe-with-two-things-to-know" id="toc-kana-safe-with-two-things-to-know">Kana: safe, with two things
+to know</a></li>
+<li><a href="#simplified-and-traditional-han-right-on-characters-blind-to-vocabulary" id="toc-simplified-and-traditional-han-right-on-characters-blind-to-vocabulary">Simplified
+and traditional Han: right on characters, blind to vocabulary</a></li>
+<li><a href="#romanisation-depends-entirely-on-the-language" id="toc-romanisation-depends-entirely-on-the-language">Romanisation:
+depends entirely on the language</a></li>
+<li><a href="#width-forms-are-a-separate-concern" id="toc-width-forms-are-a-separate-concern">Width forms are a separate
+concern</a></li>
+<li><a href="#normalisation-is-the-fourth-axis" id="toc-normalisation-is-the-fourth-axis">Normalisation is the fourth
+axis</a></li>
+<li><a href="#references" id="toc-references">References</a></li>
+</ul>
+</div>
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(tidycjk)</span></code></pre></div>
+<div id="four-conversions-four-different-levels-of-trust" class="section level2">
+<h2>Four conversions, four different levels of trust</h2>
+<p>This vignette covers the transforms that change <em>what characters
+are there</em> rather than how wide they are. Three of them share an
+implementation, ICU’s transliterators via <strong>stringi</strong> <span class="citation">(Unicode Consortium 2024; Gagolewski 2022)</span>, and
+the jamo pair applies the Unicode arithmetic directly. They should not
+be trusted equally.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Conversion</th>
+<th>Reversible?</th>
+<th>Uses context?</th>
+<th>Trust</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cjk_jamo()</code> / <code>cjk_compose_jamo()</code></td>
+<td>yes, exactly</td>
+<td>no</td>
+<td>complete</td>
+</tr>
+<tr class="even">
+<td><code>to_hiragana()</code> / <code>to_katakana()</code></td>
+<td>within one syllabary</td>
+<td>no</td>
+<td>high</td>
+</tr>
+<tr class="odd">
+<td><code>cjk_simplify()</code></td>
+<td>no</td>
+<td>yes</td>
+<td>good</td>
+</tr>
+<tr class="even">
+<td><code>cjk_traditionalize()</code></td>
+<td>no</td>
+<td>yes</td>
+<td>good on characters, blind to regional vocabulary</td>
+</tr>
+<tr class="odd">
+<td><code>cjk_romanize()</code></td>
+<td>no</td>
+<td>no</td>
+<td>a key for Chinese; wrong for Japanese kanji</td>
+</tr>
+</tbody>
+</table>
+<p>The rest of this vignette is why.</p>
+</div>
+<div id="hangul-jamo-exact" class="section level2">
+<h2>Hangul jamo: exact</h2>
+<p>A modern Hangul syllable is built from a leading consonant, a vowel
+and an optional trailing consonant, and Unicode encodes all 11,172
+combinations precomposed. The relationship is arithmetic,
+<code>SIndex = (LIndex * 21 + VIndex) * 28 + TIndex</code>, so the
+decomposition is exact rather than tabulated: no table can be out of
+date and no syllable is missed.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">cjk_jamo</span>(<span class="st">&quot;한글&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;ᄒ&quot; &quot;ᅡ&quot;   &quot;ᆫ&quot;   &quot;ᄀ&quot; &quot;ᅳ&quot;   &quot;ᆯ&quot;</span></span></code></pre></div>
+<p><code>cjk_jamo()</code> returns a list, one vector of jamo per
+string, so join each element before composing it back:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>back <span class="ot">&lt;-</span> <span class="fu">vapply</span>(<span class="fu">cjk_jamo</span>(<span class="st">&quot;한글&quot;</span>), paste, <span class="fu">character</span>(<span class="dv">1</span>), <span class="at">collapse =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">cjk_compose_jamo</span>(back)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;한글&quot;</span></span></code></pre></div>
+<p>The round trip is exact, because both verbs apply the Hangul
+arithmetic and nothing else. Text that is not Hangul passes through
+untouched, which is the difference from Unicode normalisation: NFD would
+split the accented letter below, and NFD and NFC alike would replace the
+compatibility ideograph with its unified form, which in a Korean column
+means rewriting Hanja.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">cjk_jamo</span>(<span class="st">&quot;café&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co">#&gt; [[1]]</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;c&quot; &quot;a&quot; &quot;f&quot; &quot;é&quot;</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">cjk_compose_jamo</span>(<span class="st">&quot;豈&quot;</span>) <span class="sc">==</span> <span class="st">&quot;豈&quot;</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>Jamo are the right unit for questions the syllable hides: which
+initial consonants a corpus favours, or whether two spellings differ
+only in a final consonant. The same syllable counts three different
+ways, each right for a different question. <code>한</code> is one
+character to <code>nchar()</code>, two terminal columns to
+<code>cjk_width()</code>, and three jamo here:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">nchar</span>(<span class="st">&quot;한&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">cjk_width</span>(<span class="st">&quot;한&quot;</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">lengths</span>(<span class="fu">cjk_jamo</span>(<span class="st">&quot;한&quot;</span>))</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; [1] 3</span></span></code></pre></div>
+</div>
+<div id="kana-safe-with-two-things-to-know" class="section level2">
+<h2>Kana: safe, with two things to know</h2>
+<p>Hiragana and katakana encode the same sounds, so the mapping never
+depends on the surrounding words.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">to_hiragana</span>(<span class="st">&quot;カタカナ&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;かたかな&quot;</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">to_katakana</span>(<span class="st">&quot;ひらがな&quot;</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;ヒラガナ&quot;</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">to_hiragana</span>(<span class="fu">to_katakana</span>(<span class="st">&quot;ひらがな&quot;</span>))</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;ひらがな&quot;</span></span></code></pre></div>
+<p>That round trip is exact because the input was in one syllabary. On
+mixed text it is not, and cannot be: converting to a single syllabary
+erases the distinction between the two, and that distinction carries
+meaning, because katakana marks loanwords, onomatopoeia and
+emphasis.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="st">&quot;アか&quot;</span>                      <span class="co"># one katakana, one hiragana</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">to_hiragana</span>(x)                    <span class="co"># both become hiragana</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;あか&quot;</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">to_katakana</span>(<span class="fu">to_hiragana</span>(x))       <span class="co"># and cannot be told apart again</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;アカ&quot;</span></span></code></pre></div>
+<p>The second thing is that ICU makes a few choices of its own. The
+small katakana <code>ヵ</code> and <code>ヶ</code> become the full-size
+hiragana <code>か</code> and <code>け</code>, and the digraph
+<code>ヿ</code> (<em>koto</em>) is spelled out as two kana, so even text
+that was all katakana does not always survive the trip:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">to_hiragana</span>(<span class="st">&quot;ヵヶ&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;かけ&quot;</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">to_katakana</span>(<span class="st">&quot;ヿ&quot;</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;コト&quot;</span></span></code></pre></div>
+<p>So the conversion is safe in the sense that matters, which is that it
+never guesses from context, but run it in one direction, as a
+normalisation, rather than expecting to undo it.</p>
+<p>Kanji, Latin and punctuation are untouched, so it is safe on a mixed
+column:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">to_katakana</span>(<span class="st">&quot;日本語のtext です&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;日本語ノtext デス&quot;</span></span></code></pre></div>
+<p>This is the normalisation you want before grouping Japanese text,
+where the same word is often written either way for emphasis.</p>
+<p>Halfwidth katakana is handled too, and composed on the way through.
+<code>ｶﾞ</code> is two code points, the kana and the halfwidth voiced
+mark U+FF9E, and comes back as the single character <code>ガ</code>:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">to_hiragana</span>(<span class="st">&quot;ｶﾀｶﾅ&quot;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;かたかな&quot;</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">to_katakana</span>(<span class="st">&quot;ｶﾞ&quot;</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;ガ&quot;</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">nchar</span>(<span class="fu">to_katakana</span>(<span class="st">&quot;ｶﾞ&quot;</span>))</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+</div>
+<div id="simplified-and-traditional-han-right-on-characters-blind-to-vocabulary" class="section level2">
+<h2>Simplified and traditional Han: right on characters, blind to
+vocabulary</h2>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">cjk_simplify</span>(<span class="st">&quot;漢字&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;汉字&quot;</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">cjk_traditionalize</span>(<span class="st">&quot;汉字&quot;</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;漢字&quot;</span></span></code></pre></div>
+<p>It is better than it looks. Simplified to traditional is genuinely
+one-to-many (simplified <code>发</code> is <code>發</code>, “to send”,
+or <code>髮</code>, “hair”, and <code>干</code> is <code>乾</code>,
+<code>幹</code> or <code>干</code>), and ICU resolves these <strong>from
+context</strong>, not character by character:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">cjk_traditionalize</span>(<span class="fu">c</span>(<span class="st">&quot;头发&quot;</span>, <span class="st">&quot;发送&quot;</span>))   <span class="co"># hair, send</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;頭髮&quot; &quot;發送&quot;</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="fu">cjk_traditionalize</span>(<span class="fu">c</span>(<span class="st">&quot;干净&quot;</span>, <span class="st">&quot;树干&quot;</span>))   <span class="co"># clean, tree trunk</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;乾淨&quot; &quot;樹幹&quot;</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="fu">cjk_traditionalize</span>(<span class="fu">c</span>(<span class="st">&quot;后天&quot;</span>, <span class="st">&quot;皇后&quot;</span>))   <span class="co"># after, empress: 后 splits both ways</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt; [1] &quot;後天&quot; &quot;皇后&quot;</span></span></code></pre></div>
+<p>All six are right, and so were the fourteen other words checked for
+this release, including <code>面条</code>/<code>面对</code> and
+<code>里面</code>/<code>公里</code>.</p>
+<p>What ICU does <em>not</em> do is substitute regional vocabulary. The
+two standards differ in the words they use, not only in glyph shape, and
+that is lexical:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">cjk_traditionalize</span>(<span class="fu">c</span>(<span class="st">&quot;软件&quot;</span>, <span class="st">&quot;鼠标&quot;</span>, <span class="st">&quot;网络&quot;</span>))</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;軟件&quot; &quot;鼠標&quot; &quot;網絡&quot;</span></span></code></pre></div>
+<p>Those are the correct characters and the wrong words in Taiwan, where
+the terms are <code>軟體</code>, <code>滑鼠</code> and
+<code>網路</code>. No character mapping can reach that, and it is what
+<a href="https://github.com/BYVoid/OpenCC">OpenCC</a> <span class="citation">(Kuo 2024)</span> and its regional configurations exist
+for. Use these functions for script conversion; reach for OpenCC when
+you need Taiwanese or Hong Kong idiom.</p>
+</div>
+<div id="romanisation-depends-entirely-on-the-language" class="section level2">
+<h2>Romanisation: depends entirely on the language</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">cjk_romanize</span>(<span class="st">&quot;中文&quot;</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;zhōng wén&quot;</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">cjk_romanize</span>(<span class="st">&quot;中文&quot;</span>, <span class="at">ascii =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;zhong wen&quot;</span></span></code></pre></div>
+<p>For Chinese this is pinyin, with tone marks unless you ask for ASCII.
+<code>ascii = TRUE</code> gives a sortable, greppable key for a CJK
+column, which is often the real reason to romanise at all.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">cjk_romanize</span>(<span class="fu">c</span>(<span class="st">&quot;こんにちは&quot;</span>, <span class="st">&quot;안녕하세요&quot;</span>))</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;kon&#39;nichiha&quot;    &quot;annyeonghaseyo&quot;</span></span></code></pre></div>
+<p>Three caveats, in increasing order of severity.</p>
+<p><strong>Han readings are per character.</strong> A character with
+several readings gets ICU’s preferred one regardless of the word it
+appears in, so common words come back wrong:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">cjk_romanize</span>(<span class="fu">c</span>(<span class="st">&quot;银行&quot;</span>, <span class="st">&quot;音乐&quot;</span>))   <span class="co"># bank, music: yín háng and yīn yuè</span></span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;yín xíng&quot; &quot;yīn lè&quot;</span></span></code></pre></div>
+<p>That is fine for a sort key and wrong for pinyin you show a
+reader.</p>
+<p><strong>No boundary between scripts.</strong> ICU spaces Han
+syllables but does not insert a break where the script changes:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">cjk_romanize</span>(<span class="st">&quot;漢字カナ&quot;</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;hàn zìkana&quot;</span></span></code></pre></div>
+<p>Segment first with <code>cjk_segment()</code> if you need word
+boundaries in the output.</p>
+<p><strong>Japanese kanji come back as Chinese.</strong> This is the
+severe one. ICU routes every Han character through pinyin regardless of
+the surrounding language, so <code>日本語</code> romanises to
+<code>rì běn yǔ</code> rather than <code>nihongo</code>, and
+<code>私</code> to <code>sī</code> rather than <code>watashi</code>:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">cjk_romanize</span>(<span class="st">&quot;私は日本語を話します&quot;</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;sīha rì běn yǔwo huàshimasu&quot;</span></span></code></pre></div>
+<p>That is not an approximation of the Japanese reading; it is the
+Chinese one. The kana in the same string romanise correctly, which makes
+the output look plausible at a glance and is exactly what makes it
+dangerous. Note too that the particle <code>は</code> gives
+<code>ha</code>, which is how it is written rather than how it is
+said.</p>
+<p>For Japanese, use a morphological analyser that carries readings:
+<strong>gibasa</strong> binds MeCab and returns them <span class="citation">(Kudo, Yamamoto, and Matsumoto 2004; Kato 2025)</span>.
+<code>cjk_romanize()</code> is for Chinese, for kana, and for producing
+an ASCII sort key.</p>
+</div>
+<div id="width-forms-are-a-separate-concern" class="section level2">
+<h2>Width forms are a separate concern</h2>
+<p><code>to_halfwidth()</code> and <code>to_fullwidth()</code> change
+width and nothing else. The usual advice for fullwidth text is an
+<code>NFKC</code> pass, which does fix width, and also rewrites
+ligatures, Roman numerals and circled numbers, none of which a change of
+width asked for. When that wider fold <em>is</em> what you want, it is
+<code>cjk_normalize()</code> in the next section rather than a side
+effect here:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">as.numeric</span>(<span class="fu">to_halfwidth</span>(<span class="st">&quot;１２３&quot;</span>))</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="co">#&gt; [1] 123</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="fu">to_halfwidth</span>(<span class="st">&quot;½ Ⅸ ①&quot;</span>)   <span class="co"># NFKC rewrites all three; this leaves them</span></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;½ Ⅸ ①&quot;</span></span></code></pre></div>
+<p>The one composition it does perform is voiced halfwidth katakana,
+where a single syllable is written as two code points. Composing them is
+the difference between text that matches a literal and text that
+silently does not:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="st">&quot;ｶﾞ&quot;</span></span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">nchar</span>(x)</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="fu">nchar</span>(<span class="fu">to_halfwidth</span>(x))</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="fu">to_halfwidth</span>(x) <span class="sc">==</span> <span class="st">&quot;ガ&quot;</span></span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+</div>
+<div id="normalisation-is-the-fourth-axis" class="section level2">
+<h2>Normalisation is the fourth axis</h2>
+<p>Width, script and syllabary are three axes; the code points
+themselves are the fourth. <code>cjk_normalize()</code> applies the
+Unicode normalisation forms <span class="citation">(Whistler
+2026)</span>, which is what decides whether two strings that render
+identically compare equal:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>both <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;が&quot;</span>, <span class="st">&quot;が&quot;</span>)   <span class="co"># composed, then KA + voiced mark</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a><span class="fu">nchar</span>(both)</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="co">#&gt; [1] 1 2</span></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="fu">nchar</span>(<span class="fu">cjk_normalize</span>(both))</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="co">#&gt; [1] 1 1</span></span></code></pre></div>
+<p><code>&quot;nfkc&quot;</code> is the blunt instrument the width verbs exist to
+avoid, and it is the right tool when matching rather than display is the
+goal:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">cjk_normalize</span>(<span class="st">&quot;ＡＢ　①&quot;</span>, <span class="at">form =</span> <span class="st">&quot;nfkc&quot;</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;AB 1&quot;</span></span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a><span class="fu">cjk_normalize</span>(<span class="st">&quot;ＡＢ　①&quot;</span>, <span class="at">form =</span> <span class="st">&quot;nfc&quot;</span>)</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;ＡＢ　①&quot;</span></span></code></pre></div>
+<p><strong>Canonical normalisation is not a no-op on Han.</strong>
+Compatibility ideographs have singleton canonical mappings, so
+<code>&quot;nfc&quot;</code> rewrites them just as <code>&quot;nfkc&quot;</code> does. This
+is the part that surprises people who reach for NFC because it is
+supposed to be the safe one:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>block <span class="ot">&lt;-</span> <span class="fu">vapply</span>(<span class="fu">c</span>(<span class="dv">0xF900</span><span class="sc">:</span><span class="dv">0xFA6D</span>, <span class="dv">0xFA70</span><span class="sc">:</span><span class="dv">0xFAD9</span>), intToUtf8, <span class="fu">character</span>(<span class="dv">1</span>))</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">cjk_normalize</span>(block, <span class="st">&quot;nfc&quot;</span>) <span class="sc">!=</span> block)   <span class="co"># folded away by plain NFC</span></span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#&gt; [1] 460</span></span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">cjk_normalize</span>(block, <span class="st">&quot;nfc&quot;</span>) <span class="sc">==</span> block)   <span class="co"># and the survivors</span></span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a><span class="co">#&gt; [1] 12</span></span></code></pre></div>
+<p>The twelve survivors are unified ideographs that were encoded in the
+compatibility block by accident and have no mapping to apply. So the
+block is neither preserved nor uniformly folded: if the distinction
+between a compatibility ideograph and its unified form means something
+in your data, as it can in Korean and Japanese name records, keep the
+original column.</p>
+<p>Variation selectors are the other thing that defeats an exact match,
+and four of the five forms leave them alone:</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>ivs <span class="ot">&lt;-</span> <span class="st">&quot;辻\U000E0100&quot;</span></span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a><span class="fu">nchar</span>(<span class="fu">cjk_normalize</span>(ivs))</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a><span class="co">#&gt; [1] 2</span></span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a><span class="fu">nchar</span>(<span class="fu">cjk_normalize</span>(ivs, <span class="at">drop_variation_selectors =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+<p>They are dropped <em>before</em> the form is applied, not after: a
+selector has combining class zero and blocks canonical composition
+across itself, so stripping one afterwards can leave text that is no
+longer in the form you just asked for.</p>
+</div>
+<div id="references" class="section level2 unnumbered">
+<h2 class="unnumbered">References</h2>
+<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
+<div id="ref-gagolewski2022stringi" class="csl-entry">
+Gagolewski, Marek. 2022. <span>“<span class="nocase">stringi</span>:
+Fast and Portable Character String Processing in <span>R</span>.”</span>
+<em>Journal of Statistical Software</em> 103 (2): 1–59. <a href="https://doi.org/10.18637/jss.v103.i02">https://doi.org/10.18637/jss.v103.i02</a>.
+</div>
+<div id="ref-gibasa" class="csl-entry">
+Kato, Akiru. 2025. <em><span class="nocase">gibasa</span>: An
+Alternative ’Rcpp’ Wrapper of ’MeCab’</em>. <a href="https://CRAN.R-project.org/package=gibasa">https://CRAN.R-project.org/package=gibasa</a>.
+</div>
+<div id="ref-kudo2004mecab" class="csl-entry">
+Kudo, Taku, Kaoru Yamamoto, and Yuji Matsumoto. 2004. <span>“Applying
+Conditional Random Fields to <span>J</span>apanese Morphological
+Analysis.”</span> In <em>Proceedings of the 2004 Conference on Empirical
+Methods in Natural Language Processing (EMNLP)</em>, 230–37.
+</div>
+<div id="ref-opencc" class="csl-entry">
+Kuo, Carbo. 2024. <em><span>OpenCC</span>: Open <span>C</span>hinese
+Convert</em>. <a href="https://github.com/BYVoid/OpenCC">https://github.com/BYVoid/OpenCC</a>.
+</div>
+<div id="ref-icu" class="csl-entry">
+Unicode Consortium. 2024. <em><span class="nocase">International
+Components for Unicode</span></em>. <a href="https://icu.unicode.org/">https://icu.unicode.org/</a>.
+</div>
+<div id="ref-uax15" class="csl-entry">
+Whistler, Ken. 2026. <span>“<span>Unicode Standard Annex #15: Unicode
+Normalization Forms</span>.”</span> Unicode Standard Annex 15. The
+Unicode Consortium. <a href="https://www.unicode.org/reports/tr15/">https://www.unicode.org/reports/tr15/</a>.
+</div>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -14,7 +14,7 @@
 # API: consistent naming, and a width-aware truncate, which stringi does not
 # have.
 
-# `width` validation, shared by cjk_pad() and cjk_truncate().
+# `width` validation, shared by cjk_pad(), cjk_truncate() and cjk_wrap().
 #
 # as.integer() alone is too permissive: as.integer("abc") is a warning and an
 # NA, so a typo would come back as missing output rather than as an error. A
@@ -24,7 +24,14 @@
   if (length(width) == 0L) {
     stop("`width` must have at least one element.", call. = FALSE)
   }
-  if (!is.numeric(width) && !all(is.na(width))) {
+  # is.atomic() before is.na(), and that ordering is the point: the second
+  # test exists so that an all-NA logical vector passes and propagates, but
+  # is.na() on a closure or an environment warns before the error is
+  # reached, which leaks R's internals into a plain argument mistake.
+  # Every other validator in the package gets this free by checking the
+  # type first and letting `||` short-circuit; this one needs `&&`, so the
+  # guard is explicit.
+  if (!is.numeric(width) && !(is.atomic(width) && all(is.na(width)))) {
     stop("`width` must be numeric.", call. = FALSE)
   }
   # Inf and anything beyond the integer range are numeric, so they clear the
@@ -100,7 +107,10 @@
 #'   numeric vector is measured as R chooses to write it -- which moves
 #'   with `options(scipen)` and `options(OutDec)`, and can therefore
 #'   differ between sessions. Convert deliberately if you mean to
-#'   measure numbers; these verbs are for text.
+#'   measure numbers; these verbs are for text. A list is *not* coerced --
+#'   [as.character()] deparses one rather than coercing it, so the text
+#'   measured would be the R code that builds the list -- so a list, a data
+#'   frame or a function is an error naming what to do instead.
 #'
 #' @return An integer vector the same length as `x`. `NA` input gives `NA`; the
 #'   empty string gives `0`.
@@ -118,7 +128,7 @@
 #' cjk_width(c("\u4e2d\u6587", "abcd"))
 #' @export
 cjk_width <- function(x) {
-  x <- as.character(x)
+  x <- .cjk_as_text(x)
   if (length(x) == 0L) {
     return(integer(0))
   }
@@ -168,10 +178,15 @@ cjk_width <- function(x) {
 #' cat(paste0("|", cjk_pad(c("\u4e2d\u6587", "abcd"), 6), "|"), sep = "\n")
 #' @export
 cjk_pad <- function(x, width, side = "right", pad = " ") {
-  x <- as.character(x)
-  side <- match.arg(side, c("right", "left", "both"))
-  if (!is.character(pad) || length(pad) != 1L || is.na(pad) ||
-      nchar(pad) != 1L) {
+  x <- .cjk_as_text(x)
+  side <- .cjk_arg_match(side, c("right", "left", "both"), "side")
+  if (!is.character(pad) || length(pad) != 1L || is.na(pad)) {
+    stop("`pad` must be a single, non-missing character.", call. = FALSE)
+  }
+  # Ahead of nchar(), which answers undecodable bytes with an error of its own
+  # naming neither the argument nor the encoding.
+  .cjk_check_encoding(pad, "pad")
+  if (nchar(pad) != 1L) {
     stop("`pad` must be a single, non-missing character.", call. = FALSE)
   }
   if (stringi::stri_width(pad) != 1L) {
@@ -234,20 +249,25 @@ cjk_pad <- function(x, width, side = "right", pad = " ") {
 #' @seealso [cjk_pad()] for the other direction; [cjk_width()] for the measure
 #'   both use.
 #' @examples
-#' # six columns is three ideographs
+#' # six columns would be three ideographs, but "..." is counted against
+#' # the budget and costs three of them, so one ideograph is what fits
 #' cjk_truncate("\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587", 6)
 #'
-#' # ASCII, same budget
+#' # the same six columns hold three ASCII characters plus the ellipsis
 #' cjk_truncate("abcdefghij", 6)
+#'
+#' # drop the ellipsis and all six columns are available again
+#' cjk_truncate("\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587", 6, ellipsis = "")
 #'
 #' # already fits, so nothing happens
 #' cjk_truncate("\u4e2d\u6587", 10)
 #' @export
 cjk_truncate <- function(x, width, ellipsis = "...") {
-  x <- as.character(x)
+  x <- .cjk_as_text(x)
   if (!is.character(ellipsis) || length(ellipsis) != 1L || is.na(ellipsis)) {
     stop("`ellipsis` must be a single, non-missing string.", call. = FALSE)
   }
+  .cjk_check_encoding(ellipsis, "ellipsis")
   # Validated ahead of the zero-length exit, for the reason given in cjk_pad().
   width <- .cjk_as_width(width)
   if (length(x) == 0L) {
@@ -262,9 +282,9 @@ cjk_truncate <- function(x, width, ellipsis = "...") {
   # Split to code points once for the whole vector, as the width above already
   # is. .cjk_codepoints() is vectorised but carries a fixed per-call cost -- an
   # encoding-error handler and a byte-order-mark scan -- and calling it from
-  # inside the loop paid that cost once per element instead of once per vector.
-  # Measured on 50,000 strings that was about a third of cjk_truncate()'s total
-  # time, for no answer that differs.
+  # inside the loop paid that cost once per element instead of once per
+  # vector, a large share of cjk_truncate()'s time on a long column, for no
+  # answer that differs.
   #
   # Conditional, because a column that all fits never needs the code points at
   # all and splitting it anyway was slower than the per-element version it
@@ -317,6 +337,10 @@ cjk_truncate <- function(x, width, ellipsis = "...") {
   if (w <= 0L) {
     return("")
   }
+  # Not reachable through cjk_truncate(): an empty string has width 0 and
+  # is returned by the fits-already test above, and NA is caught before
+  # that. Kept because this takes code points from a caller that may not
+  # have made those checks.
   if (is.null(cp) || length(cp) == 0L) {
     return("")
   }
@@ -326,4 +350,190 @@ cjk_truncate <- function(x, width, ellipsis = "...") {
     return("")
   }
   stringi::stri_enc_fromutf32(list(cp[seq_len(keep)]))
+}
+
+
+#' Wrap text to a display width
+#'
+#' Breaks each string into lines no wider than `width` terminal columns,
+#' completing the layout set with [cjk_pad()] and [cjk_truncate()]. Like them,
+#' it counts columns rather than characters.
+#'
+#' @details
+#' The break positions come from ICU's implementation of Unicode Annex #14,
+#' the line breaking algorithm, which is what makes this more than
+#' `strwrap()` with a different counter. CJK text is mostly breakable
+#' *between* characters -- there are no spaces to break at -- but not
+#' everywhere: a closing bracket may not begin a line, an opening bracket may
+#' not end one, and the ideographic full stop U+3002 may not start one
+#' either. Splitting every `width` columns would put breaks in all three
+#' places. Latin runs inside the same string still break on spaces. A fourth
+#' rule, about small kana, holds only in some locales -- see below.
+#'
+#' Lines are returned joined by `\n`, so the result is the same length as `x`
+#' and can go straight to `cat()`. `strsplit(out, "\n", fixed = TRUE)` gives
+#' the lines separately.
+#'
+#' A line comes out wider than `width` only where no break is allowed inside
+#' it, and then ICU emits it whole rather than looping. That happens in three
+#' cases: a character wider than the budget (a CJK character needs two
+#' columns, so `width = 1` cannot be honoured), a run with no break
+#' opportunity in it, such as a long Latin word or a stretch of a URL, and an
+#' `indent` or `exdent` that leaves no room for the text after it.
+#'
+#' # The break style depends on the locale
+#'
+#' Annex #14 defines three line-breaking styles -- strict, normal and loose --
+#' and which one applies is tailored per locale. The difference that shows up
+#' in CJK text is small kana: under `"en"` a small kana may not begin a line,
+#' and under `"ja"`, which uses the looser style, it may. So the same call
+#' wraps Japanese differently depending on the session locale, which is why
+#' `locale` is an argument here rather than left implicit. Name it when the
+#' output has to be reproducible, and `"ja@lb=strict"` if you want the strict
+#' style for Japanese.
+#'
+#' The rules that hold whatever the locale are the ones about punctuation: a
+#' closing bracket or an ideographic full stop never begins a line, and an
+#' opening bracket never ends one.
+#'
+#' # Lines are filled greedily
+#'
+#' Each line takes as much text as fits before the next break opportunity
+#' would overflow it, which is what a terminal does. `stri_wrap()`'s own
+#' default is an optimal fit that evens out line lengths across a paragraph;
+#' it is not used here, because its cost grows far faster than the text
+#' (40,000 characters of CJK exhaust 1.5 GB of memory), and because the
+#' breaks it picks for the start of a paragraph depend on how the paragraph
+#' ends, so appending a sentence can re-flow every line above it. Greedy
+#' breaks depend only on the text up to them.
+#'
+#' A leading byte-order mark survives, which takes work: stringi drops one.
+#' A U+FEFF *elsewhere* in the string may not, because re-flowing can put it
+#' at the start of a segment, where stringi reads it as a byte-order mark
+#' again and removes it. Unicode deprecated U+FEFF for any use other than
+#' marking the start of a stream, so this only bites text that is already
+#' using it against the standard's advice -- but it is a content change, and
+#' this page would rather say so than have you find it.
+#'
+#' Three behaviours differ from [cjk_pad()] and [cjk_truncate()], because
+#' this verb re-flows text rather than measuring it in place. Existing
+#' newlines in `x` are whitespace to the algorithm and are replaced by the
+#' new line breaks, so `"a\nb"` wrapped wide comes back as `"a b"`; wrap the
+#' pieces separately if the original breaks are meaningful. A string of
+#' nothing but whitespace re-flows to `""`, where `cjk_pad()` would have
+#' kept it.
+#'
+#' And the output is in normalisation form C. ICU's line-breaking works on
+#' normalised text, so `stri_wrap()` normalises, and 1,120 code points
+#' therefore come back changed. 1,002 of them are the CJK Compatibility
+#' Ideographs (U+F900-U+FAD9 and U+2F800-U+2FA1D): `cjk_wrap("\uf900", 2)`
+#' is U+8C48. The other 118 are the Hebrew presentation forms, a handful of
+#' musical symbols, and 71 scattered singletons and composition exclusions:
+#' the Kelvin, Ohm and Angstrom signs, Greek letters with an oxia,
+#' Devanagari letters with a nukta, and U+2329 and U+232A, which become the
+#' CJK angle brackets U+3008 and U+3009. These are exactly the code points
+#' NFC changes, no more and no fewer, each a duplicate of a character or
+#' sequence Unicode prefers and kept for compatibility. Everyday text,
+#' precomposed Latin and Hangul syllables included, is already NFC and
+#' passes through untouched.
+#' [cjk_pad()], [cjk_truncate()] and [cjk_segment()] do **not** normalise,
+#' so this is the one layout verb that can change a character. Undoing it
+#' would mean re-aligning re-flowed output against the input, which risks
+#' corrupting ordinary text to protect a deprecated corner of it; running
+#' [cjk_normalize()] first is the way to make the normalisation explicit
+#' and expected.
+#'
+#' @inheritParams cjk_pad
+#' @param width Target width in columns. Recycled against `x`.
+#' @param indent Columns to indent the first line of each string by.
+#' @param exdent Columns to indent every line after the first by.
+#' @param locale ICU locale selecting the line-breaking style, e.g. `"ja"` or
+#'   `"ja@lb=strict"`. `NULL`, the default, uses the session default -- which
+#'   means the result depends on where it is run; see Details.
+#'
+#' @return A character vector the same length as the recycled inputs, each
+#'   element the wrapped text with lines separated by `\n`. `NA` gives `NA`.
+#'   As in [cjk_pad()] and [cjk_truncate()], a `width` longer than `x`
+#'   recycles `x` up to it rather than being an error.
+#' @seealso [cjk_pad()] and [cjk_truncate()] for the fixed-width forms,
+#'   [cjk_width()] for the measurement itself.
+#' @examples
+#' # "I am happy today, because the weather is very good"
+#' x <- paste0("\u6211\u4eca\u5929\u5f88\u958b\u5fc3\uff0c",
+#'               "\u56e0\u70ba\u5929\u6c23\u975e\u5e38\u597d")
+#' cat(cjk_wrap(x, 12), "\n")
+#'
+#' # every line is within the budget, measured in columns
+#' cjk_width(strsplit(cjk_wrap(x, 12), "\n", fixed = TRUE)[[1]])
+#'
+#' # hanging indent
+#' cat(cjk_wrap(x, 12, exdent = 2), "\n")
+#'
+#' # the strict style, so a small kana never begins a line
+#' cat(cjk_wrap("\u304d\u3087\u3046\u306f\u3068\u3066\u3082\u3044\u3044",
+#'              6, locale = "ja@lb=strict"), "\n")
+#' @export
+cjk_wrap <- function(x, width, indent = 0L, exdent = 0L,
+                     locale = NULL) {
+  x <- .cjk_as_text(x)
+  # Validate ahead of the zero-length exit, so a bad argument is an error
+  # whatever the length of `x` -- the same ordering as cjk_pad(). The locale
+  # too: checked inside the call to stringi, it was never checked at all for
+  # input that is empty or entirely NA.
+  width <- .cjk_as_width(width)
+  locale <- .cjk_check_locale(locale, "break data",
+                              "Use a language such as \"zh\", \"ja\" or \"ko\".")
+  for (nm in c("indent", "exdent")) {
+    v <- get(nm)
+    # The upper bound for the reason .cjk_as_width() has one: past the integer
+    # range as.integer() gives NA with a bare coercion warning, and stringi
+    # then fails on the NA with a message about its own argument.
+    if (!is.numeric(v) || length(v) != 1L || is.na(v) || !is.finite(v) ||
+        v < 0 || v > .Machine$integer.max) {
+      stop("`", nm, "` must be a single, non-negative, non-missing number ",
+           "within integer range.", call. = FALSE)
+    }
+  }
+  indent <- as.integer(indent)
+  exdent <- as.integer(exdent)
+  if (length(x) == 0L) {
+    return(character(0))
+  }
+  n <- .cjk_recycled_length(x, width)
+  x <- rep_len(x, n)
+  width <- rep_len(width, n)
+
+  # Hide a leading byte-order mark from stri_wrap(), which would drop it.
+  # Re-flowing text is not licence to delete a character from it, and the
+  # mark is zero width, so removing and restoring it cannot move a break.
+  bom <- .cjk_leading_bom(x)
+  x <- .cjk_strip_bom(x, bom)
+
+  out <- rep(NA_character_, n)
+  usable <- !is.na(x) & !is.na(width)
+  # An empty string has nothing to re-flow, and stri_wrap() would give
+  # character(0) for it; "" is the answer that keeps the length contract.
+  out[usable & !nzchar(x)] <- ""
+
+  # stri_wrap() takes one width, but it is vectorised over the strings, so
+  # the work is one call per *distinct* width rather than one per element,
+  # and the cost of a column grows with its widths rather than its rows: the
+  # same once-per-vector point the block table and cjk_truncate() already
+  # make.
+  todo <- usable & nzchar(x)
+  for (w in unique(width[todo])) {
+    idx <- which(todo & width == w)
+    # cost_exponent = 0 is the greedy fill; see "Lines are filled greedily"
+    # under Details for why stringi's optimal fit is not used. The width is
+    # measured in columns by default (use_length = TRUE is what switches it
+    # to code points), so it already agrees with cjk_width().
+    lines <- .cjk_stri(stringi::stri_wrap(
+      x[idx], width = w, indent = indent, exdent = exdent,
+      simplify = FALSE, whitespace_only = FALSE, locale = locale,
+      cost_exponent = 0
+    ))
+    out[idx] <- vapply(lines, paste, character(1), collapse = "\n")
+  }
+  out <- .cjk_restore_bom(out, bom)
+  out
 }

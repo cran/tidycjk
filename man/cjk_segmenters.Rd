@@ -28,16 +28,60 @@ Where a word begins and ends in CJK text is a fact about a language, not
 about Unicode, so it cannot be derived the way everything else in this
 package is. It needs a dictionary and a statistical model, and which one is
 right depends on the language and the corpus. \pkg{tidycjk} therefore
-bundles no word segmenter and dispatches on a name instead.
+dispatches on a name rather than committing to one.
 
-One engine ships with the package. \code{"character"} needs nothing at all:
-every CJK character becomes its own token and runs of non-CJK text are
-split on whitespace. Whitespace is never a token, the ideographic space
-U+3000 included, even though \code{\link[=has_cjk]{has_cjk()}} counts it as CJK. It is character
-tokenisation rather than word segmentation, and for Chinese it will cut
-two-character words in half. It is a baseline, not an answer.
+Two engines ship with the package.
+
+\code{"icu"} is a real word segmenter. ICU carries dictionary-based break
+iterators for Chinese and Japanese, and stringi carries ICU, so this costs
+no dependency you have not already installed: a six-character Chinese
+sentence comes back as its four words rather than as six characters.
+
+It returns surface forms only, with no part of speech, lemma or user
+dictionary, and its models are lighter than MeCab's or jieba's tuned ones.
+It is the right starting point and not the last word.
+
+\code{locale} is accepted and forwarded, but it does not select the dictionary.
+ICU applies a single combined Chinese-Japanese word list to Han and kana
+runs, chosen by the script of the text, so Chinese and Japanese segment
+the same way under \code{"zh"}, \code{"ja"} or the session default.
+
+\code{"character"} needs nothing at all: every CJK character becomes its own
+token and runs of non-CJK text are split on whitespace. Whitespace is never
+a token, the ideographic space U+3000 included, even though \code{\link[=has_cjk]{has_cjk()}}
+counts it as CJK. It is character tokenisation rather than word
+segmentation, and for Chinese it will cut two-character words in half. It
+is a baseline, not an answer.
 }
-\section{Registering a word segmenter}{
+\section{The two engines do not tokenise punctuation alike}{
+This matters when comparing counts, so it is worth stating rather than
+leaving to be discovered. \code{"icu"} drops punctuation and symbols along with
+whitespace; \code{"character"} keeps CJK punctuation as tokens, because those
+code points are in blocks \code{\link[=cjk_blocks]{cjk_blocks()}} lists, and keeps a run of
+non-CJK text whole up to the next space.
+
+The upshot is that the same sentence yields different token counts, and
+the gap is punctuation rather than a disagreement about where words end.
+An emoji is dropped by \code{"icu"} and kept by \code{"character"} for the same
+reason. Filter or compare accordingly.
+
+Zero-width characters divide the same way, in three groups.
+\code{"character"} keeps all of them wherever they sit. \code{"icu"} drops U+200B
+everywhere, because ICU classifies the zero-width space as "none" in
+every position and this engine asks for "none" to be skipped; it drops
+U+200D, U+00AD, U+2060, a combining mark and a variation selector only
+when one begins the string, which is the one position ICU calls "none"
+for those. A byte-order mark survives both engines, and for a different
+reason worth keeping straight: stringi removes a leading U+FEFF before
+ICU is called at all, so that one is data loss rather than policy, and
+both engines put it back.
+}
+
+\section{Registering another segmenter}{
+For Japanese, \href{https://CRAN.R-project.org/package=gibasa}{gibasa} binds
+MeCab and is on CRAN; it gives part of speech and lemma, which \code{"icu"} does
+not.
+
 \href{https://CRAN.R-project.org/package=jiebaR}{jiebaR}, which binds
 \href{https://github.com/yanyiwu/cppjieba}{cppjieba}, is the usual choice for
 Chinese. It was archived from CRAN on 2025-05-01, so it cannot be a
@@ -68,6 +112,21 @@ each element a character vector of tokens. \code{NA} input should give
 contract. A plain list is required: a data frame is a list too, but
 \code{length()} on one counts columns rather than elements, so it is refused
 rather than quietly mistaken for a list of tokens.
+
+A leading byte-order mark is preserved by both built-in engines, and by
+neither of the stringi calls underneath them: \code{stri_split_charclass()}
+and \code{stri_split_boundaries()} each read a leading U+FEFF as a byte-order
+mark and drop it. Both engines count it off and put it back, so a column
+read from a BOM-carrying CSV tokenises without losing a character. An
+engine you register yourself gets no such treatment -- if it calls
+stringi, it needs the same guard.
+
+The elements are checked too, for the same reason one level down. An
+atomic element is coerced with \code{\link[=as.character]{as.character()}}, so an engine returning
+integers or a factor works; a list element is refused, because
+\code{as.character()} deparses a list rather than coercing it and
+\code{list(c(1, 2))} would otherwise arrive as the single token \code{"c(1, 2)"} --
+R code spelled out as data.
 }
 
 \section{Passing arguments to an engine}{

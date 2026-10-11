@@ -12,13 +12,13 @@
 # is any function of (x, ...) returning a list of character vectors, parallel
 # to x.
 #
-# No word segmenter is bundled, and `engine` has no default. jiebaR was the
-# obvious candidate and it was archived from CRAN on 2025-05-01, so it cannot
-# be a dependency of a CRAN package; and the only engine we can ship without
-# one, "character", answers a different question from the one a caller asking
-# for words is asking. Rather than quietly hand back character tokens, the
-# choice is required. ?cjk_segmenters shows how to register jiebaR in four
-# lines if you have it.
+# Two engines ship with the package. "icu" is a real word segmenter, from the
+# dictionaries ICU carries inside stringi; "character" is the dictionary-free
+# baseline. `engine` still has no default, because the right answer depends on
+# the language: "character" answers a different question from the one a
+# caller asking for words is asking, and handing back its output silently is
+# the mistake this package exists to avoid. Rather than guess, the choice is
+# required. ?cjk_segmenters shows how to register jiebaR or gibasa as well.
 
 # User-registered engines. Built-ins are not kept here, so a caller can shadow
 # one deliberately but cannot delete it by accident.
@@ -64,8 +64,8 @@
     # what guarantees that, and it is what this line depends on.
     #
     # Dropping the second split() is the point: split() coerces the run ids to
-    # a factor, which sorts and stringifies them once per string, and profiling
-    # a corpus of 30,000 put split()/as.factor() at about a third of the total.
+    # a factor, which sorts and stringifies them once per string, and that
+    # was among the largest costs when this engine was profiled.
     cjk_piece <- is_cjk[!duplicated(run)]
     out <- unlist(lapply(seq_along(pieces), function(i) {
       if (cjk_piece[[i]]) {
@@ -77,19 +77,128 @@
         # tokenised differently on two machines. ICU's WHITE_SPACE is the same
         # set everywhere, which is the property the rest of the package holds
         # to -- see the note on strsplit() in .cjk_take_width().
-        unlist(
-          stringi::stri_split_charclass(pieces[[i]], "\\p{WHITE_SPACE}",
+        #
+        # The BOM guard the rest of the package takes, needed here too:
+        # stri_split_charclass() reads a leading U+FEFF in its *input* as a
+        # byte-order mark and drops it, and omit_empty = TRUE then discards
+        # the emptied piece -- so a mark beginning a non-CJK run vanished
+        # altogether. It is the only character this happened to. U+200B,
+        # U+200D, U+00AD, U+2060 and a combining mark are all zero-width,
+        # all non-whitespace, and all became tokens of their own; U+FEFF
+        # did not, which made the engine inconsistent with its own rule
+        # rather than deliberately quiet about format characters.
+        piece <- pieces[[i]]
+        nb <- if (startsWith(piece, "\uFEFF")) {
+          .cjk_leading_bom(piece)
+        } else {
+          0L
+        }
+        tok <- unlist(
+          stringi::stri_split_charclass(.cjk_strip_bom(piece, nb),
+                                        "\\p{WHITE_SPACE}",
                                         omit_empty = TRUE),
           use.names = FALSE
         )
+        if (nb == 0L) {
+          tok
+        } else {
+          mark <- strrep("\uFEFF", nb)
+          if (length(tok) == 0L) {
+            mark
+          } else {
+            c(paste0(mark, tok[[1L]]), tok[-1L])
+          }
+        }
       }
     }), use.names = FALSE)
+    # unlist() answers NULL for an empty list rather than character(0).
+    # Not reachable today -- the two exits above take the only inputs that
+    # leave `pieces` empty -- but the engine contract is a character vector
+    # per element, and NULL is not one.
     if (is.null(out)) character(0) else out
   })
 }
 
+# ICU's dictionary-based word segmenter, reached through stringi. This is a
+# real segmenter -- it splits a six-character Chinese sentence into its four
+# words rather than into six characters -- and it costs no new dependency,
+# because stringi is already an Import and ICU ships the Chinese and Japanese
+# dictionaries inside it.
+#
+# That is worth stating plainly, because the package shipped 0.1.0 saying no
+# segmenter could be bundled. jiebaR being archived from CRAN was true and is
+# still true; the error was concluding from it that there was no bundled
+# option at all, when the one already linked into a hard dependency had been
+# there the whole time.
+#
+# It is not a replacement for a language-specific analyser. ICU's model is
+# lighter than MeCab's for Japanese and than jieba's tuned dictionaries for
+# Chinese, it returns surface forms with no part of speech or lemma, and it
+# takes no user dictionary. It is the right default and the wrong last word.
+#
+# `locale` is accepted and forwarded, but it does not choose the dictionary:
+# ICU applies one combined Chinese-Japanese word list to Han and kana runs,
+# selected by the script of the text. Measured over seven CJK strings under
+# five locales, the output was identical every time. It is passed through
+# because ICU may use it elsewhere and because the guard catches a typo --
+# not because it switches models.
+.cjk_engine_icu <- function(x, locale = NULL, ...) {
+  x <- .cjk_as_text(x)
+  locale <- .cjk_check_locale(locale, "break data",
+                              "Use a language such as \"zh\", \"ja\" or \"ko\".")
+  # stri_split_boundaries() drops a leading U+FEFF, while ICU keeps one in
+  # the middle of a string and attaches it to the adjacent word. That made
+  # the engine treat the same character two ways depending on where it sat,
+  # so the leading run is counted off and restored onto the first token --
+  # the position ICU itself puts an interior one in.
+  #
+  # Do NOT generalise this to the other zero-width characters. They look
+  # like the same case and are not, and skip_word_none = FALSE is what
+  # separates them: a leading U+200B, U+200D, U+00AD, U+2060, U+0301 or
+  # U+FE00 comes back as a token of its own, so ICU saw it and the engine's
+  # own documented rule is what removes it. A leading U+FEFF is absent even
+  # then -- stringi strips it before ICU is ever called. One is a policy
+  # this engine opted into; the other is a character disappearing. Only the
+  # second is ours to put back.
+  bom <- .cjk_leading_bom(x)
+  x <- .cjk_strip_bom(x, bom)
+  # skip_word_none drops everything ICU classifies as "none" -- whitespace,
+  # punctuation and symbols alike. Note that this is NOT the same rule the
+  # "character" engine follows: that one drops whitespace but keeps CJK
+  # punctuation, because U+3002 and friends sit in a block cjk_blocks()
+  # lists. The two engines therefore return different token counts for the
+  # same string, and the difference is punctuation, not segmentation.
+  out <- .cjk_stri(stringi::stri_split_boundaries(
+    x, type = "word", skip_word_none = TRUE, locale = locale
+  ))
+  # stringi already returns NA for NA input and character(0) for "", which is
+  # the engine contract; the coercion is only so an NA element is typed
+  # NA_character_ rather than the logical NA a zero-token split can produce.
+  out <- lapply(out, function(tok) {
+    if (length(tok) == 1L && is.na(tok)) NA_character_ else as.character(tok)
+  })
+  for (i in which(bom > 0L)) {
+    mark <- strrep("\uFEFF", bom[[i]])
+    t_i <- out[[i]]
+    out[[i]] <- if (length(t_i) == 0L) {
+      # the whole string was marks: they are the only tokens there are
+      mark
+    } else if (is.na(t_i[[1L]])) {
+      # Not reachable: .cjk_leading_bom() counts 0 for NA, so this loop
+      # never visits an NA element. Kept for the reason the identical
+      # branch in cjk_sentences() is kept -- the NA case and this one are
+      # the same contract, and neither should have to be rediscovered.
+      t_i
+    } else {
+      c(paste0(mark, t_i[[1L]]), t_i[-1L])
+    }
+  }
+  out
+}
+
+
 .cjk_builtin_engines <- function() {
-  list(character = .cjk_engine_character)
+  list(character = .cjk_engine_character, icu = .cjk_engine_icu)
 }
 
 
@@ -103,16 +212,60 @@
 #' about Unicode, so it cannot be derived the way everything else in this
 #' package is. It needs a dictionary and a statistical model, and which one is
 #' right depends on the language and the corpus. \pkg{tidycjk} therefore
-#' bundles no word segmenter and dispatches on a name instead.
+#' dispatches on a name rather than committing to one.
 #'
-#' One engine ships with the package. `"character"` needs nothing at all:
-#' every CJK character becomes its own token and runs of non-CJK text are
-#' split on whitespace. Whitespace is never a token, the ideographic space
-#' U+3000 included, even though [has_cjk()] counts it as CJK. It is character
-#' tokenisation rather than word segmentation, and for Chinese it will cut
-#' two-character words in half. It is a baseline, not an answer.
+#' Two engines ship with the package.
 #'
-#' # Registering a word segmenter
+#' `"icu"` is a real word segmenter. ICU carries dictionary-based break
+#' iterators for Chinese and Japanese, and stringi carries ICU, so this costs
+#' no dependency you have not already installed: a six-character Chinese
+#' sentence comes back as its four words rather than as six characters.
+#'
+#' It returns surface forms only, with no part of speech, lemma or user
+#' dictionary, and its models are lighter than MeCab's or jieba's tuned ones.
+#' It is the right starting point and not the last word.
+#'
+#' `locale` is accepted and forwarded, but it does not select the dictionary.
+#' ICU applies a single combined Chinese-Japanese word list to Han and kana
+#' runs, chosen by the script of the text, so Chinese and Japanese segment
+#' the same way under `"zh"`, `"ja"` or the session default.
+#'
+#' `"character"` needs nothing at all: every CJK character becomes its own
+#' token and runs of non-CJK text are split on whitespace. Whitespace is never
+#' a token, the ideographic space U+3000 included, even though [has_cjk()]
+#' counts it as CJK. It is character tokenisation rather than word
+#' segmentation, and for Chinese it will cut two-character words in half. It
+#' is a baseline, not an answer.
+#'
+#' # The two engines do not tokenise punctuation alike
+#'
+#' This matters when comparing counts, so it is worth stating rather than
+#' leaving to be discovered. `"icu"` drops punctuation and symbols along with
+#' whitespace; `"character"` keeps CJK punctuation as tokens, because those
+#' code points are in blocks [cjk_blocks()] lists, and keeps a run of
+#' non-CJK text whole up to the next space.
+#'
+#' The upshot is that the same sentence yields different token counts, and
+#' the gap is punctuation rather than a disagreement about where words end.
+#' An emoji is dropped by `"icu"` and kept by `"character"` for the same
+#' reason. Filter or compare accordingly.
+#'
+#' Zero-width characters divide the same way, in three groups.
+#' `"character"` keeps all of them wherever they sit. `"icu"` drops U+200B
+#' everywhere, because ICU classifies the zero-width space as "none" in
+#' every position and this engine asks for "none" to be skipped; it drops
+#' U+200D, U+00AD, U+2060, a combining mark and a variation selector only
+#' when one begins the string, which is the one position ICU calls "none"
+#' for those. A byte-order mark survives both engines, and for a different
+#' reason worth keeping straight: stringi removes a leading U+FEFF before
+#' ICU is called at all, so that one is data loss rather than policy, and
+#' both engines put it back.
+#'
+#' # Registering another segmenter
+#'
+#' For Japanese, [gibasa](https://CRAN.R-project.org/package=gibasa) binds
+#' MeCab and is on CRAN; it gives part of speech and lemma, which `"icu"` does
+#' not.
 #'
 #' [jiebaR](https://CRAN.R-project.org/package=jiebaR), which binds
 #' [cppjieba](https://github.com/yanyiwu/cppjieba), is the usual choice for
@@ -145,6 +298,21 @@
 #' contract. A plain list is required: a data frame is a list too, but
 #' `length()` on one counts columns rather than elements, so it is refused
 #' rather than quietly mistaken for a list of tokens.
+#'
+#' A leading byte-order mark is preserved by both built-in engines, and by
+#' neither of the stringi calls underneath them: `stri_split_charclass()`
+#' and `stri_split_boundaries()` each read a leading U+FEFF as a byte-order
+#' mark and drop it. Both engines count it off and put it back, so a column
+#' read from a BOM-carrying CSV tokenises without losing a character. An
+#' engine you register yourself gets no such treatment -- if it calls
+#' stringi, it needs the same guard.
+#'
+#' The elements are checked too, for the same reason one level down. An
+#' atomic element is coerced with [as.character()], so an engine returning
+#' integers or a factor works; a list element is refused, because
+#' `as.character()` deparses a list rather than coercing it and
+#' `list(c(1, 2))` would otherwise arrive as the single token `"c(1, 2)"` --
+#' R code spelled out as data.
 #'
 #' # Passing arguments to an engine
 #'
@@ -251,12 +419,17 @@ register_cjk_segmenter <- function(name, fn) {
 #' sentence as one token; this dispatches to a segmentation engine instead.
 #'
 #' @details
-#' `engine` is required and has no default. The only engine \pkg{tidycjk} can
-#' ship without a dictionary is `"character"`, which tokenises by character
-#' rather than by word -- a different answer from the one you are asking for,
-#' and quietly returning it would be the mistake this package exists to avoid.
-#' [cjk_segmenters()] lists what is available and shows how to register a real
-#' word segmenter.
+#' Two engines ship with the package. `"icu"` is a real word segmenter, using
+#' the dictionary ICU carries inside \pkg{stringi}, so it costs no dependency
+#' you have not already installed. `"character"` tokenises by character rather
+#' than by word.
+#'
+#' `engine` is required and has no default, because `"character"` answers a
+#' different question from the one a caller asking for words is asking, and
+#' quietly returning it would be the mistake this package exists to avoid.
+#' The two also differ on punctuation: `"icu"` drops it, `"character"` keeps
+#' CJK punctuation as tokens. [cjk_segmenters()] lists what is available and
+#' shows how to register another.
 #'
 #' @inheritParams has_cjk
 #' @param engine Name of a segmentation engine, or a function implementing
@@ -271,6 +444,9 @@ register_cjk_segmenter <- function(name, fn) {
 #' @seealso [cjk_tokens()] for the tidy version, [cjk_segmenters()] for the
 #'   engines and for registering one.
 #' @examples
+#' # a real word segmenter: four words, not six characters
+#' cjk_segment("\u6211\u4eca\u5929\u5f88\u958b\u5fc3", engine = "icu")
+#'
 #' # the dictionary-free baseline, one token per CJK character
 #' cjk_segment("\u6211\u4eca\u5929\u5f88\u958b\u5fc3", engine = "character")
 #'
@@ -285,11 +461,19 @@ cjk_segment <- function(x, engine, ...) {
          paste0("\"", cjk_segmenters(), "\"", collapse = ", "), ".",
          call. = FALSE)
   }
-  x <- as.character(x)
-  if (length(x) == 0L) {
+  x <- .cjk_as_text(x)
+  # Resolved before the zero-length exit, so an unknown engine is an error
+  # whatever the length of `x`; looked up after it, cjk_segment(character(0),
+  # engine = "nope") and a zero-row cjk_tokens() returned quietly. A built-in
+  # engine is then called even on empty input, which is how the "icu"
+  # engine's `locale` gets checked there too. An engine registered by the
+  # caller is not, because 0.1.0 never asked one to handle an empty vector
+  # and nothing in the contract warned that it might.
+  fn <- .cjk_get_engine(engine)
+  if (length(x) == 0L &&
+      !any(vapply(.cjk_builtin_engines(), identical, logical(1), fn))) {
     return(list())
   }
-  fn <- .cjk_get_engine(engine)
   out <- fn(x, ...)
   # Three failures rather than one. ?cjk_segmenters invites callers to write
   # their own engine, so this is the error they are most likely to meet, and
@@ -313,8 +497,25 @@ cjk_segment <- function(x, engine, ...) {
          length(x), " element(s), the engine returned ", length(out), ".",
          call. = FALSE)
   }
-  lapply(out, function(tok) {
-    if (is.null(tok)) character(0) else as.character(tok)
+  # Four, then: the element type too. as.character() on a list does not
+  # coerce it, it *deparses* it, so an engine handing back list(c(1, 2))
+  # produced the literal token "c(1, 2)" -- a bogus token instead of an
+  # error, which is the same failure the data frame check above exists to
+  # stop, one level down. An atomic vector or a factor is coerced as before,
+  # because as.character() means the obvious thing for both.
+  lapply(seq_along(out), function(i) {
+    tok <- out[[i]]
+    if (is.null(tok)) {
+      return(character(0))
+    }
+    if (!is.atomic(tok)) {
+      stop("The segmentation engine must return a character vector for ",
+           "each element of `x`: element ", i, " is ", class(tok)[[1L]],
+           ". as.character() deparses a list rather than coercing it, so ",
+           "this would have become a token spelling out R code.",
+           call. = FALSE)
+    }
+    as.character(tok)
   })
 }
 
@@ -334,8 +535,12 @@ cjk_segment <- function(x, engine, ...) {
 #' vanish from the output.
 #'
 #' The token column is called `token` and is added to `data`; an existing
-#' column of that name is replaced. As with [cjk_segment()], `engine` is
-#' required.
+#' column of that name is replaced. Set `output` to put the tokens
+#' somewhere else when `data` already has a column worth keeping under that
+#' name -- the same escape hatch \pkg{tidytext}'s `unnest_tokens()` gives
+#' you. It comes after `...` and so has to be named in full, which is what
+#' stops it competing with an engine argument for a prefix. As with
+#' [cjk_segment()], `engine` is required.
 #'
 #' Grouping is dropped, as it is by [cjk_summary()]: the result is a plain
 #' tibble even when `data` is a `grouped_df`. Regroup it afterwards if you need
@@ -343,6 +548,8 @@ cjk_segment <- function(x, engine, ...) {
 #'
 #' @inheritParams cjk_summary
 #' @inheritParams cjk_segment
+#' @param output Name for the token column. Defaults to `"token"`. It
+#'   follows `...`, so it has to be given by its full name.
 #'
 #' @return `data`, as a tibble, with one row per token and an added `token`
 #'   column. Row order follows the input, and tokens within a row follow the
@@ -350,13 +557,23 @@ cjk_segment <- function(x, engine, ...) {
 #' @seealso [cjk_segment()] for the vector version, [cjk_char_counts()] when
 #'   you want characters rather than words.
 #' @examples
+#' # "I am very happy", then a row mixing Latin with "Chinese writing"
 #' df <- data.frame(
 #'   id = 1:2,
 #'   text = c("\u6211\u5f88\u958b\u5fc3", "hello \u4e2d\u6587")
 #' )
 #' cjk_tokens(df, text, engine = "character")
 #' @export
-cjk_tokens <- function(data, col, engine, ...) {
+cjk_tokens <- function(data, col, engine, ..., output = "token") {
+  # `output` sits after the dots deliberately, so it has to be given by its
+  # full name. An argument before them can be claimed by R's partial
+  # matching from a prefix -- the hazard "Passing arguments to an engine"
+  # describes -- and an engine argument abbreviated to `out` would
+  # otherwise be swallowed by this one instead of reaching the engine.
+  if (!is.character(output) || length(output) != 1L || is.na(output) ||
+        !nzchar(output)) {
+    stop("`output` must be a single, non-empty string.", call. = FALSE)
+  }
   if (missing(engine)) {
     stop("`engine` must be given; there is no safe default. Use ",
          "engine = \"character\" for character tokenisation, or register a ",
@@ -364,7 +581,7 @@ cjk_tokens <- function(data, col, engine, ...) {
          paste0("\"", cjk_segmenters(), "\"", collapse = ", "), ".",
          call. = FALSE)
   }
-  v <- as.character(.cjk_pull(dplyr::pull(data, {{ col }}), data))
+  v <- .cjk_as_text(.cjk_pull(dplyr::pull(data, {{ col }}), data), "col")
   toks <- cjk_segment(v, engine = engine, ...)
   # A row is repeated once per token, so a row that tokenised to nothing is
   # dropped by having its index repeated zero times. An NA document is not one
@@ -376,6 +593,6 @@ cjk_tokens <- function(data, col, engine, ...) {
   flat <- unlist(toks, use.names = FALSE)
   # unlist() of nothing is NULL, and assigning NULL would drop the column
   # rather than create an empty one
-  out$token <- if (is.null(flat)) character(0) else flat
+  out[[output]] <- if (is.null(flat)) character(0) else flat
   out
 }
